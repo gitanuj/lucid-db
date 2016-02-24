@@ -11,7 +11,7 @@ import java.util.List;
 public class CopycatTestServer {
 
     public static void main(String[] args) throws Exception {
-        Utils.enableLogging();
+//        Utils.enableLogging();
 
         String host = InetAddress.getLocalHost().getHostName();
         int selfPort = Integer.valueOf(args[0]);
@@ -25,7 +25,7 @@ public class CopycatTestServer {
         CopycatServer server = CopycatServer.builder(selfAddress, members)
                 .withTransport(new NettyTransport())
                 .withStateMachine(MapStateMachine::new)
-                .withStorage(new Storage(".", StorageLevel.DISK))
+                .withStorage(new Storage("logs/" + args[0] + System.currentTimeMillis()))
                 .build();
 
         server.open().join();

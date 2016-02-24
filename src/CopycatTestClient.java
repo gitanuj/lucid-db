@@ -5,15 +5,16 @@ import io.atomix.copycat.client.CopycatClient;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class CopycatTestClient {
 
     public static void main(String[] args) throws Exception {
-        Utils.enableLogging();
+//        Utils.enableLogging();
 
         String host = InetAddress.getLocalHost().getHostName();
         List<Address> members = new ArrayList<>();
-        for (int i = 1; i < args.length; i++) {
+        for (int i = 0; i < args.length; i++) {
             members.add(new Address(host, Integer.valueOf(args[i])));
         }
 
@@ -23,9 +24,9 @@ public class CopycatTestClient {
 
         client.open().join();
 
-        client.submit(new PutCommand("foo", "Hello world!")).get();
+        client.submit(new PutCommand("foo", "Hello world!")).get(5, TimeUnit.SECONDS);
 
-        System.out.println(client.submit(new GetQuery("foo")).get());
+        System.out.println(client.submit(new GetQuery("foo")).get(5, TimeUnit.SECONDS));
 
         client.close().join();
     }
