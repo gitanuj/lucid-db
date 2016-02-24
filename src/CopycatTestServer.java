@@ -27,6 +27,7 @@ public class CopycatTestServer {
                 .withStateMachine(MapStateMachine::new)
                 .withStorage(new Storage("logs/" + args[0] + System.currentTimeMillis()))
                 .build();
+        server.serializer().disableWhitelist();
 
         server.open().join();
     }

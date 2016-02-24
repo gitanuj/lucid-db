@@ -21,6 +21,7 @@ public class CopycatTestClient {
         CopycatClient client = CopycatClient.builder(members)
                 .withTransport(new NettyTransport())
                 .build();
+        client.serializer().disableWhitelist();
 
         client.open().join();
 
