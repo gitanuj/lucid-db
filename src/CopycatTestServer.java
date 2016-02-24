@@ -2,7 +2,6 @@ import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
-import io.atomix.copycat.server.storage.StorageLevel;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -25,7 +24,7 @@ public class CopycatTestServer {
         CopycatServer server = CopycatServer.builder(selfAddress, members)
                 .withTransport(new NettyTransport())
                 .withStateMachine(MapStateMachine::new)
-                .withStorage(new Storage("logs/" + args[0] + System.currentTimeMillis()))
+                .withStorage(new Storage("logs/" + args[0]))
                 .build();
         server.serializer().disableWhitelist();
 
