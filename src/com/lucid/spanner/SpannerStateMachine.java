@@ -1,5 +1,6 @@
 package com.lucid.spanner;
 
+import io.atomix.copycat.server.Commit;
 import io.atomix.copycat.server.Snapshottable;
 import io.atomix.copycat.server.StateMachine;
 import io.atomix.copycat.server.storage.snapshot.SnapshotReader;
@@ -22,5 +23,41 @@ public class SpannerStateMachine extends StateMachine implements Snapshottable {
     public void install(SnapshotReader reader) {
         // Read the snapshotted map
         map = reader.readObject();
+    }
+
+    public void write(Commit<WriteCommand> commit) {
+        try {
+            // TODO
+            return;
+        } finally {
+            commit.close();
+        }
+    }
+
+    public void read(Commit<ReadQuery> commit) {
+        try {
+            // TODO
+            return;
+        } finally {
+            commit.close();
+        }
+    }
+
+    public void prepareCommit(Commit<PrepareCommitCommand> commit) {
+        try {
+            // TODO
+            return;
+        } finally {
+            commit.close();
+        }
+    }
+
+    public void commit(Commit<CommitCommand> commit) {
+        try {
+            // TODO
+            return;
+        } finally {
+            commit.close();
+        }
     }
 }
