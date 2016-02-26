@@ -1,3 +1,5 @@
+package com.lucid.test;
+
 import io.atomix.copycat.server.Commit;
 import io.atomix.copycat.server.Snapshottable;
 import io.atomix.copycat.server.StateMachine;

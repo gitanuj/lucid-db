@@ -1,3 +1,5 @@
+package com.lucid.test;
+
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
 import io.atomix.copycat.client.CopycatClient;

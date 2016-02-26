@@ -1,3 +1,5 @@
+package com.lucid.test;
+
 import io.atomix.copycat.Command;
 
 public class RemoveCommand implements Command<Object> {

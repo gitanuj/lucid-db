@@ -1,3 +1,5 @@
+package com.lucid.test;
+
 import io.atomix.copycat.Query;
 
 public class GetQuery implements Query<Object> {
