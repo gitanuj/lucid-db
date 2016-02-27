@@ -106,24 +106,77 @@ public class SpannerServer {
         SpannerUtils.startThreadWithName(serverRunnable, "ServerAccept Thread at Server ");
     }
 
+    /*   For 2PC, servers communicate among themselves as follows:
+         1. Leaders who are not coordinators: Send PREPARE_ACK / PREPARE_NACK message once they are Prepared
+             "PACK:tid" or
+             "PNACK:tid"
+         2. Coordinator sends commit/abort after getting messages from everyone
+             "COMMIT:tid" or
+             "ABORT:tid"
+     */
     private void handleServerAccept(Socket cohort){
-        // TODO: Parse and determine msg type, tid
-        SpannerUtils.SERVER_MSG msg = SpannerUtils.SERVER_MSG.PREPAREACK;
-        int tid = 0;
-        int nShards = 0;
+        String inputLine = "";
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(cohort.getInputStream()));
+            inputLine = in.readLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-        if(msg == SpannerUtils.SERVER_MSG.PREPAREACK){
+        SpannerUtils.SERVER_MSG msgType;
+        int tid;
+
+        if(inputLine.startsWith("PACK")){
+            msgType = SpannerUtils.SERVER_MSG.PREPARE_ACK;
+        }
+        else if(inputLine.startsWith("PNACK")){
+            msgType = SpannerUtils.SERVER_MSG.PREPARE_NACK;
+        }
+        else if(inputLine.startsWith("COMMIT")){
+            msgType = SpannerUtils.SERVER_MSG.COMMIT;
+        }
+        else if(inputLine.startsWith("ABORT")){
+            msgType = SpannerUtils.SERVER_MSG.ABORT;
+        }
+        else{
+            logger.error("Unknown msg recd from cohort:"+inputLine);
+            try {
+                cohort.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
+        String[] msg = inputLine.split(":");
+        tid = Integer.parseInt(msg[1]);
+
+        if(msgType == SpannerUtils.SERVER_MSG.PREPARE_ACK){
             if(!iAmCoordinator()){
-                logger.error("Prepare recd at non-coordinator");
+                logger.error("PrepareAck recd at non-coordinator");
             }
             else
                 twoPC.recvPrepareAck(tid);
         }
-        else if(msg == SpannerUtils.SERVER_MSG.COMMIT) {
+        else if(msgType == SpannerUtils.SERVER_MSG.COMMIT) {
             if(iAmCohort() || iAmCoordinator()){
                 logger.error("Commit recd at non-leader");
             }
-            // TODO: commit using Paxos
+            // TODO: commit using Paxos and release Locks
+        }
+        else if(msgType == SpannerUtils.SERVER_MSG.PREPARE_NACK){
+            if(!iAmCoordinator()){
+                logger.error("PrepareNack recd at non-coordinator");
+            }
+            else{
+                twoPC.recvPrepareAck(tid);
+            }
+        }
+        else if(msgType == SpannerUtils.SERVER_MSG.ABORT){
+            if(iAmCohort() || iAmCoordinator()){
+                logger.error("Abort recd at non-leader");
+            }
+            // TODO: abort using Paxos and release Locks
         }
     }
 
@@ -173,10 +226,15 @@ public class SpannerServer {
                         // TODO: Determine number of shards involved
                         twoPC.addNewTxn(tid, nShards);
                         twoPC.waitForPrepareAcks(tid);
-                        handlePrepareAck(tid);
+                        if(twoPC.canCommit(tid)) {
+                            handleAllPrepareAcks(tid);
+                        }
+                        else{
+                            handlePrepareNack(tid);
+                        }
                     }
                     else{
-                        // TODO: get coordinator IP from request and send PrepareAck
+                        // TODO: get coordinator IP from request and send PREPARE_ACK / PREPARENACK
                     }
 
                 } catch (IOException e) {
@@ -187,7 +245,7 @@ public class SpannerServer {
         SpannerUtils.startThreadWithName(clientRunnable, "Client Handling thread for client:");
     }
 
-    private void handlePrepareAck(int tid){
+    private void handleAllPrepareAcks(int tid){
         // TODO: Commit locally
         // TODO: Do Paxos in own cluster for CommitMsg
         // TODO: Release Locks
@@ -196,20 +254,28 @@ public class SpannerServer {
 
     }
 
+    private void handlePrepareNack(int tid){
+        // TODO: Abort locally
+        // TODO: Do Paxos in own cluster for AbortMsg
+        // TODO: Release Locks
+        // TODO: Send 2PC abort to client and other leaders.
+        twoPC.removeTxn(tid);
+    }
+
     private boolean iAmLeader(){
-        SpannerUtils.ROLE role = SpannerUtils.ROLE.COHORT;
+        SpannerUtils.ROLE role;
         role = getMyRole();
         return (role == SpannerUtils.ROLE.LEADER) || (role == SpannerUtils.ROLE.COORDINATOR);
     }
 
     private boolean iAmCoordinator(){
-        SpannerUtils.ROLE role = SpannerUtils.ROLE.COHORT;
+        SpannerUtils.ROLE role;
         role = getMyRole();
         return role == SpannerUtils.ROLE.COORDINATOR;
     }
 
     private boolean iAmCohort(){
-        SpannerUtils.ROLE role = SpannerUtils.ROLE.COHORT;
+        SpannerUtils.ROLE role;
         role = getMyRole();
         return role == SpannerUtils.ROLE.COHORT;
     }
@@ -220,22 +286,24 @@ public class SpannerServer {
         return role;
     }
 
-
-
     public static void main(String[] args) {
 
     }
 }
 
 class TState{
+    public enum CSTATE{
+        COMMIT, ABORT, UNKNOWN
+    }
     int numShards;
     Semaphore prepareCount;
-    //int prepareCount;
+    CSTATE commit;
     //int commit_count;
 
     public TState(int nShards){
         numShards = nShards;
         prepareCount = new Semaphore(-1*nShards + 1);
+        commit = CSTATE.UNKNOWN;
         //commit_count = 0;
     }
 
@@ -282,6 +350,8 @@ class TwoPC{
         int nshards = tState.numShards;
         try {
             tState.prepareCount.acquire(nshards);
+            if(tState.commit != TState.CSTATE.ABORT)    // Haven't recd NACK
+                tState.commit = TState.CSTATE.COMMIT;
         } catch (InterruptedException e) {
             e.printStackTrace();
             logger.info("Interrupted while waiting for prepared. tid:"+tid);
@@ -291,11 +361,31 @@ class TwoPC{
     public void recvPrepareAck(int tid){
         if(!txnState.containsKey(tid)){
             // When prepare ack from other Leaders is recd after prepare from client
-            logger.error("Recd prepare but Txn does not exist tid:"+tid);
+            logger.error("Recd prepareAck but Txn does not exist tid:"+tid);
             return;
             //addNewTxn(tid, Config.NUM_CLUSTERS);
         }
-        TState tstate = txnState.get(tid);
-        tstate.prepareCount.release();
+        TState tState = txnState.get(tid);
+        tState.prepareCount.release();
+    }
+
+    public void recvPrepareNack(int tid){
+        if(!txnState.containsKey(tid)){
+            // When prepare ack from other Leaders is recd after prepare from client
+            logger.error("Recd prepareNack but Txn does not exist tid:"+tid);
+            return;
+            //addNewTxn(tid, Config.NUM_CLUSTERS);
+        }
+        TState tState = txnState.get(tid);
+        tState.commit = TState.CSTATE.ABORT;
+        tState.prepareCount.release(tState.numShards);  // Semaphore released immediately to let know waiting server
+    }
+
+    public boolean canCommit(int tid){
+        TState tState = txnState.get(tid);
+        if(tState.commit == TState.CSTATE.COMMIT)
+            return true;
+        else
+            return false;
     }
 }

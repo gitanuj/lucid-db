@@ -16,8 +16,8 @@ public class SpannerUtils {
         COORDINATOR, LEADER, COHORT
     }
 
-    public static enum SERVER_MSG{
-        PREPAREACK, COMMIT
+    public enum SERVER_MSG{
+        PREPARE_ACK, PREPARE_NACK, COMMIT, ABORT
     }
 
     public static ch.qos.logback.classic.Logger root;
