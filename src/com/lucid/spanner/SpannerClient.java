@@ -5,10 +5,7 @@ import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -18,7 +15,7 @@ import java.io.InputStreamReader;
 
 public class SpannerClient {
     private int selfPort;
-    SpannerClient(int port){
+    public SpannerClient(int port){
         this.selfPort = port;
     }
 
@@ -31,25 +28,28 @@ public class SpannerClient {
         return result;
     }
 
-    public void executeCommand(Command command) throws UnexpectedCommand{
+    public void executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound{
         // Coordinator cluster
 //        CopycatClient coordinatorClient = SpannerUtils.buildClient(SpannerUtils.getClusterIPs(commands.get(0)));
 //        coordinatorClient.open().join();
 //        coordinatorClient.close().join();
-        HashMap<String, Address> sessionMap = new HashMap<>();
+        HashMap<String, Socket> sessionMap = new HashMap<>();
         Socket socket;
         Scanner reader;
-
+        Set<Map.Entry<String, Object>> commands;
         if(command instanceof WriteCommand) {
-            for (Map.Entry entry : ((WriteCommand) command).getWriteCommands().entrySet()) {
+            commands = ((WriteCommand) command).getWriteCommands().entrySet();
+            for (Map.Entry entry : commands) {
                 String key = (String)entry.getKey();
                 for (Address address : SpannerUtils.getClusterIPs(key)) {
                     try {
                         socket = new Socket(address.host(), address.port());
                         reader = new Scanner(new InputStreamReader(socket.getInputStream()));
                         if (SpannerUtils.ROLE.values()[reader.nextInt()] == SpannerUtils.ROLE.LEADER) {
-                            sessionMap.put(key, address);
+                            sessionMap.put(key, socket);
                         }
+                        else
+                            socket.close();
                     } catch (Exception e) {
                         SpannerUtils.root.error(e.getMessage());
                     }
@@ -57,9 +57,13 @@ public class SpannerClient {
                 if (sessionMap.get(key) == null)
                     throw new LeaderNotFound("Leader not found for key " + command);
             }
+
+            for(Map.Entry entry : commands){
+                Address address =
+                socket = new Socket()
+            }
         }
         else
            throw new UnexpectedCommand("Command not an instance of WriteCommand.");
-
     }
 }

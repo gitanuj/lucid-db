@@ -10,8 +10,8 @@ import java.util.List;
 
 public class SpannerUtils {
 
-    public static final enum ROLE{
-        COORDINATOR(0), LEADER(1), COHORT(2)
+    public static enum ROLE{
+        COORDINATOR, LEADER,   COHORT
     }
 
     public static ch.qos.logback.classic.Logger root;
