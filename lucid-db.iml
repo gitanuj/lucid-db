@@ -7,9 +7,6 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="io.atomix.copycat:copycat-server:1.0.0-rc2" level="project" />
-    <orderEntry type="library" name="io.atomix.copycat:copycat-client:1.0.0-rc2" level="project" />
-    <orderEntry type="library" name="io.atomix.catalyst:catalyst-netty:1.0.1" level="project" />
-    <orderEntry type="library" name="ch.qos.logback:logback-classic:1.1.5" level="project" />
+    <orderEntry type="library" name="lib" level="project" />
   </component>
 </module>

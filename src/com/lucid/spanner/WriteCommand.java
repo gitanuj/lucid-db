@@ -1,16 +1,17 @@
 package com.lucid.spanner;
 
 import io.atomix.copycat.Command;
+import java.util.HashMap;
 
 public class WriteCommand implements Command<Object> {
 
-    private Object data;
+    private HashMap<String, Object> commands;
 
-    public WriteCommand(Object data) {
-        this.data = data;
+    public WriteCommand(HashMap<String, Object> map) {
+        this.commands = map;
     }
 
-    public Object getData() {
-        return data;
+    public Object getWriteCommand() {
+        return this.commands;
     }
 }
