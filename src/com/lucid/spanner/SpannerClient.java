@@ -1,11 +1,8 @@
 package com.lucid.spanner;
 
-import com.lucid.test.GetQuery;
-import io.atomix.catalyst.util.Listener;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
-import io.atomix.copycat.session.Event;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
