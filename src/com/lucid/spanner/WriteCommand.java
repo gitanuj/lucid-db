@@ -5,13 +5,22 @@ import java.util.HashMap;
 
 public class WriteCommand implements Command<Object> {
 
-    private HashMap<String, Object> commands;
+    private long txn_id;
+    private HashMap<String, String> commands;
 
-    public WriteCommand(HashMap<String, Object> map) {
+    public long getTxn_id() {
+        return txn_id;
+    }
+
+    public void setTxn_id(long txn_id) {
+        this.txn_id = txn_id;
+    }
+
+    public WriteCommand(HashMap<String, String> map) {
         this.commands = map;
     }
 
-    public HashMap<String, Object> getWriteCommands() {
+    public HashMap<String, String> getWriteCommands() {
         return this.commands;
     }
 }

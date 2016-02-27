@@ -11,6 +11,7 @@ import java.util.List;
 
 public class SpannerUtils {
 
+    // When sending enum over Socket, SpannerClient assumes that the "ordinal" of enum value is sent.
     public static enum ROLE{
         COORDINATOR, LEADER, COHORT
     }

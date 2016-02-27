@@ -5,6 +5,9 @@ import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
 
+import java.io.ObjectOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -14,32 +17,26 @@ import java.net.Socket;
 import java.io.InputStreamReader;
 
 public class SpannerClient {
-    private int selfPort;
-    public SpannerClient(int port){
-        this.selfPort = port;
-    }
 
-    public Object executeQuery(Query query) throws InterruptedException, ExecutionException, TimeoutException {
-        // TODO Read from specific cluster?
+    public String executeQuery(Query query) throws InterruptedException, ExecutionException, TimeoutException {
         CopycatClient client = SpannerUtils.buildClient(Config.SERVER_IPS);
         client.open().join();
-        Object result = client.submit(query).get(Config.READ_QUERY_TIMEOUT, TimeUnit.MILLISECONDS);
+        String result = (String)client.submit(query).get(Config.READ_QUERY_TIMEOUT, TimeUnit.MILLISECONDS);
         client.close().join();
         return result;
     }
 
     public void executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound{
-        // Coordinator cluster
-//        CopycatClient coordinatorClient = SpannerUtils.buildClient(SpannerUtils.getClusterIPs(commands.get(0)));
-//        coordinatorClient.open().join();
-//        coordinatorClient.close().join();
-        HashMap<String, Socket> sessionMap = new HashMap<>();
+        HashMap<String, Socket> sessionMap;
         Socket socket;
         Scanner reader;
-        Set<Map.Entry<String, Object>> commands;
+        ObjectOutputStream writer;
+        HashMap<String, String> commands;
+
         if(command instanceof WriteCommand) {
-            commands = ((WriteCommand) command).getWriteCommands().entrySet();
-            for (Map.Entry entry : commands) {
+            sessionMap = new HashMap<>();
+            commands = ((WriteCommand) command).getWriteCommands();
+            for (Map.Entry entry : commands.entrySet()) {
                 String key = (String)entry.getKey();
                 for (Address address : SpannerUtils.getClusterIPs(key)) {
                     try {
@@ -55,12 +52,18 @@ public class SpannerClient {
                     }
                 }
                 if (sessionMap.get(key) == null)
-                    throw new LeaderNotFound("Leader not found for key " + command);
+                    throw new LeaderNotFound("Leader not found for key " + key);
             }
 
-            for(Map.Entry entry : commands){
-                Address address =
-                socket = new Socket()
+            try{
+                for(Map.Entry<String, Socket> entry : sessionMap.entrySet()){
+                    socket = entry.getValue();
+                    writer = new ObjectOutputStream(socket.getOutputStream());
+                    writer.writeObject(new TransportObject(((WriteCommand) command).getTxn_id(), entry.getKey(), commands.get(entry.getKey())));
+                }
+            }
+            catch(Exception e){
+                SpannerUtils.root.error(e.getMessage());
             }
         }
         else
