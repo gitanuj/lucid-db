@@ -22,4 +22,5 @@ public final class Config {
     }
 
     public static final long READ_QUERY_TIMEOUT = 5 * 1000;
+    public static final long COMMAND_TIMEOUT = 5 * 1000;
 }

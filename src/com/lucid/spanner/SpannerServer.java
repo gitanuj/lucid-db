@@ -3,6 +3,8 @@ package com.lucid.spanner;
 import com.lucid.test.MapStateMachine;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
+import io.atomix.copycat.Command;
+import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 
@@ -15,14 +17,15 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.*;
 
 public class SpannerServer {
 
     private int clientPort;
     private int serverPort;
     private int paxosPort;
+
+    List<Address> paxosMembers;
 
     private TwoPC twoPC;
     public ch.qos.logback.classic.Logger logger;
@@ -36,6 +39,7 @@ public class SpannerServer {
         this.paxosPort = paxosPort;
         logger = SpannerUtils.root;
         twoPC = new TwoPC(this, logger);
+        paxosMembers = new ArrayList<>();
 
         // Start Paxos cluster
         startPaxosCluster();
@@ -72,13 +76,12 @@ public class SpannerServer {
         int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
         int position = index % clusterSize;
 
-        List<Address> members = new ArrayList<>();
         for (int i=position; i<Config.SERVER_IPS.size(); i += clusterSize) {
             if(i!=index){
-                members.add(Config.SERVER_IPS.get(i));
+                paxosMembers.add(Config.SERVER_IPS.get(i));
             }
         }
-        CopycatServer server = CopycatServer.builder(selfPaxosAddress, members)
+        CopycatServer server = CopycatServer.builder(selfPaxosAddress, paxosMembers)
                 .withTransport(new NettyTransport())
                 .withStateMachine(MapStateMachine::new)
                 .withStorage(new Storage("logs/" + host + paxosPort))
@@ -108,8 +111,8 @@ public class SpannerServer {
 
     /*   For 2PC, servers communicate among themselves as follows:
          1. Leaders who are not coordinators: Send PREPARE_ACK / PREPARE_NACK message once they are Prepared
-             "PACK:tid" or
-             "PNACK:tid"
+             "PREPARE_ACK:tid" or
+             "PREPARE_NACK:tid"
          2. Coordinator sends commit/abort after getting messages from everyone
              "COMMIT:tid" or
              "ABORT:tid"
@@ -124,12 +127,12 @@ public class SpannerServer {
         }
 
         SpannerUtils.SERVER_MSG msgType;
-        int tid;
+        long tid;
 
-        if(inputLine.startsWith("PACK")){
+        if(inputLine.startsWith("PREPARE_ACK")){
             msgType = SpannerUtils.SERVER_MSG.PREPARE_ACK;
         }
-        else if(inputLine.startsWith("PNACK")){
+        else if(inputLine.startsWith("PREPARE_NACK")){
             msgType = SpannerUtils.SERVER_MSG.PREPARE_NACK;
         }
         else if(inputLine.startsWith("COMMIT")){
@@ -162,7 +165,12 @@ public class SpannerServer {
             if(iAmCohort() || iAmCoordinator()){
                 logger.error("Commit recd at non-leader");
             }
-            // TODO: commit using Paxos and release Locks
+            // Commit using Paxos in own cluster
+            CommitCommand cmd = new CommitCommand(tid);
+            paxosReplicate(cmd);
+
+            // Release Locks
+            releaseLocks(tid);
         }
         else if(msgType == SpannerUtils.SERVER_MSG.PREPARE_NACK){
             if(!iAmCoordinator()){
@@ -176,7 +184,12 @@ public class SpannerServer {
             if(iAmCohort() || iAmCoordinator()){
                 logger.error("Abort recd at non-leader");
             }
-            // TODO: abort using Paxos and release Locks
+            // Abort using Paxos in own cluster
+            AbortCommand cmd = new AbortCommand(tid);
+            paxosReplicate(cmd);
+
+            // Release Locks
+            releaseLocks(tid);
         }
     }
 
@@ -204,37 +217,59 @@ public class SpannerServer {
             @Override
             public void run() {
                 try {
-                    int tid = 0;
+                    long tid = 0;
                     int nShards = 0;
                     // Send my role to the client
                     PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                     out.println(getMyRole());
 
-                    // TODO: should ideally check if client closes connection now. Then cleanup and exit.
+                    // Check if client closes connection now. Then cleanup and exit.
+                    if(client.isClosed()){
+                        return;
+                    }
 
                     // TODO: Read Command from client (as JSON), Make sure this is PREPARE msg
                     BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                     String inputLine = in.readLine();
+
+                    TransportObject transportObject = null;
                     // TODO: De-serialize Commit object, get tid
 
-                    // TODO: Try to obtain locks (blocking)
+                    List <String> keys = new ArrayList<>();
+                    List <Object> values = new ArrayList<>();
+                    keys.add(transportObject.getKey());  // TODO: we should actually get list of keys and values
+                    values.add(transportObject.getValue());
+                    tid = transportObject.getTxn_id();
 
-                    // TODO: Create CopycatClient; create and submit PrepareCommitCommand. Blocking wait.
+                    // Try to obtain locks (blocking)
+                    obtainLocks(tid, keys);
+
+                    // Replicate PrepareCommitCommand using Paxos.
+                    PrepareCommitCommand prepCommand = new PrepareCommitCommand(keys, values);
+                    paxosReplicate(prepCommand);
 
                     // If I am coordinator, wait till all are prepared.
                     if(iAmCoordinator()) {
                         // TODO: Determine number of shards involved
                         twoPC.addNewTxn(tid, nShards);
                         twoPC.waitForPrepareAcks(tid);
+                        Address clientAddr = new Address(client.getInetAddress().getHostName(), client.getPort());
                         if(twoPC.canCommit(tid)) {
+                            // send COMMIT to client
+                            send2PCMsgSingle(SpannerUtils.SERVER_MSG.COMMIT, tid, clientAddr);
                             handleAllPrepareAcks(tid);
                         }
                         else{
+                            // Send Abort to client
+                            send2PCMsgSingle(SpannerUtils.SERVER_MSG.COMMIT, tid, clientAddr);
                             handlePrepareNack(tid);
                         }
                     }
                     else{
                         // TODO: get coordinator IP from request and send PREPARE_ACK / PREPARENACK
+                        //Address coordAddr = new Address(transportObject.getCoordinator().host(), transportObject.getCoordinator().port());
+                        Address coordAddr = new Address("", 1234);
+                        send2PCMsgSingle(SpannerUtils.SERVER_MSG.PREPARE_ACK, tid, coordAddr);
                     }
 
                 } catch (IOException e) {
@@ -245,20 +280,37 @@ public class SpannerServer {
         SpannerUtils.startThreadWithName(clientRunnable, "Client Handling thread for client:");
     }
 
-    private void handleAllPrepareAcks(int tid){
-        // TODO: Commit locally
-        // TODO: Do Paxos in own cluster for CommitMsg
-        // TODO: Release Locks
-        // TODO: Send 2PC commit to client and other leaders.
+    /* After receiving PREPARE_ACKs from everyone, txn is ready for commit.
+
+     */
+    private void handleAllPrepareAcks(long tid){
+        // (Commit locally) Do Paxos in own cluster for CommitMsg
+        CommitCommand cmd = new CommitCommand(tid);
+        paxosReplicate(cmd);
+
+        // Release Locks
+        releaseLocks(tid);
+
+        // Send 2PC commit to other leaders.
+        send2PCMsg(SpannerUtils.SERVER_MSG.COMMIT, tid, null);
+
+        // Remove transaction from list of active txns
         twoPC.removeTxn(tid);
 
     }
 
-    private void handlePrepareNack(int tid){
-        // TODO: Abort locally
-        // TODO: Do Paxos in own cluster for AbortMsg
-        // TODO: Release Locks
-        // TODO: Send 2PC abort to client and other leaders.
+    private void handlePrepareNack(long tid){
+        // (Abort locally) Do Paxos in own cluster for AbortMsg
+        AbortCommand cmd = new AbortCommand(tid);
+        paxosReplicate(cmd);
+
+        // Release Locks
+        releaseLocks(tid);
+
+        // Send 2PC abort to other leaders.
+        send2PCMsg(SpannerUtils.SERVER_MSG.ABORT, tid, null);
+
+        // Remove transaction from list of active txns
         twoPC.removeTxn(tid);
     }
 
@@ -284,6 +336,67 @@ public class SpannerServer {
         SpannerUtils.ROLE role = SpannerUtils.ROLE.COHORT;
         // TODO: Determine own role
         return role;
+    }
+
+    private void paxosReplicate(Command command){
+        // Create CopyCat client and replicate command
+        CopycatClient client = CopycatClient.builder(paxosMembers)
+                .withTransport(new NettyTransport())
+                .build();
+        client.serializer().disableWhitelist();
+
+        client.open().join();
+
+        try {
+            client.submit(command).get(Config.COMMAND_TIMEOUT, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            e.printStackTrace();
+        }
+
+        client.close().join();
+    }
+
+    private void send2PCMsg(SpannerUtils.SERVER_MSG msgType, long tid, List<Address> recipients) {
+        // Send to all Leaders
+        if (recipients == null) {
+            for (Address addr : paxosMembers) {
+                send2PCMsgSingle(msgType, tid, addr);
+            }
+
+        } else {
+            // Send to given list
+            for (Address addr : paxosMembers) {
+                send2PCMsgSingle(msgType, tid, addr);
+            }
+        }
+    }
+
+    private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Address addr) {
+        String msg = msgType.toString()+":"+tid;
+        try {
+            Socket socket = new Socket(addr.host(), addr.port());
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            out.println(msg);
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void obtainLocks(long tid, List<String> key){
+        // TODO: get locks
+    }
+
+    private void releaseLocks(long tid){
+        if(!iAmLeader()){
+            logger.debug("I am not a leader :/");
+            return;
+        }
+        // TODO: release locks
     }
 
     public static void main(String[] args) {
@@ -315,7 +428,7 @@ class TState{
 
 
 class TwoPC{
-    ConcurrentHashMap<Integer, TState> txnState;
+    ConcurrentHashMap<Long, TState> txnState;
     public ch.qos.logback.classic.Logger logger;
 
     public TwoPC(SpannerServer spannerServer, ch.qos.logback.classic.Logger logger){
@@ -323,7 +436,7 @@ class TwoPC{
         this.logger = logger;
     }
 
-    public void addNewTxn(int tid, int nShards){
+    public void addNewTxn(long tid, int nShards){
         if(txnState.containsKey(tid)){
             logger.error("Add Txn called multiple times for same tid.");
             //TState tState = txnState.get(tid);
@@ -333,19 +446,19 @@ class TwoPC{
         txnState.put(tid, new TState(nShards));
     }
 
-    public TState removeTxn(int tid){
+    public TState removeTxn(long tid){
         return txnState.remove(tid);
     }
 
-    public TState get(int tid){
+    public TState get(long tid){
         return txnState.get(tid);
     }
 
-    public boolean isActive(int tid){
+    public boolean isActive(long tid){
         return txnState.containsKey(tid);
     }
 
-    public void waitForPrepareAcks(int tid){
+    public void waitForPrepareAcks(long tid){
         TState tState = txnState.get(tid);
         int nshards = tState.numShards;
         try {
@@ -358,7 +471,7 @@ class TwoPC{
         }
     }
 
-    public void recvPrepareAck(int tid){
+    public void recvPrepareAck(long tid){
         if(!txnState.containsKey(tid)){
             // When prepare ack from other Leaders is recd after prepare from client
             logger.error("Recd prepareAck but Txn does not exist tid:"+tid);
@@ -369,7 +482,7 @@ class TwoPC{
         tState.prepareCount.release();
     }
 
-    public void recvPrepareNack(int tid){
+    public void recvPrepareNack(long tid){
         if(!txnState.containsKey(tid)){
             // When prepare ack from other Leaders is recd after prepare from client
             logger.error("Recd prepareNack but Txn does not exist tid:"+tid);
@@ -381,7 +494,7 @@ class TwoPC{
         tState.prepareCount.release(tState.numShards);  // Semaphore released immediately to let know waiting server
     }
 
-    public boolean canCommit(int tid){
+    public boolean canCommit(long tid){
         TState tState = txnState.get(tid);
         if(tState.commit == TState.CSTATE.COMMIT)
             return true;
