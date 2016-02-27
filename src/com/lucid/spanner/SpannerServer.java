@@ -1,6 +1,10 @@
 package com.lucid.spanner;
 
+import com.lucid.test.MapStateMachine;
 import io.atomix.catalyst.transport.Address;
+import io.atomix.catalyst.transport.NettyTransport;
+import io.atomix.copycat.server.CopycatServer;
+import io.atomix.copycat.server.storage.Storage;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,10 +14,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 
@@ -29,23 +30,15 @@ public class SpannerServer {
     Map<Integer, Integer> txnPrepares;
 
 
-    SpannerServer(int clientPort, int serverPort, int paxosPort) throws UnknownHostException {
+    SpannerServer(int clientPort, int serverPort, int paxosPort) {
         this.clientPort = clientPort;
         this.serverPort = serverPort;
         this.paxosPort = paxosPort;
         logger = SpannerUtils.root;
         twoPC = new TwoPC(this, logger);
 
-        // TODO: Start Paxos cluster
-        String host = InetAddress.getLocalHost().getHostName();
-        Address selfPaxosAddress = new Address(host, paxosPort);
-
-        for (Address addr:Config.SERVER_IPS) {
-            //if(SpannerUtils.isThisMyIpAddress((InetAddress) addr)){
-
-            //}
-
-        }
+        // Start Paxos cluster
+        startPaxosCluster();
 
         // Start server accept thread
         acceptServers();
@@ -55,6 +48,45 @@ public class SpannerServer {
 
     }
 
+    private void startPaxosCluster() {
+        String host = null;
+        try {
+            host = InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+            logger.error("UnknownHostException while starting paxos cluser.");
+            e.printStackTrace();
+        }
+        Address selfPaxosAddress = new Address(host, paxosPort);
+
+        int index = -1;
+        for (Address addr:Config.SERVER_IPS) {
+            index++;
+            if(SpannerUtils.isThisMyIpAddress(addr.host(), addr.port())){
+                break;
+            }
+        }
+        if(index >= Config.SERVER_IPS.size()){
+            logger.error("could not find own ip in IpList!!");
+        }
+
+        int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
+        int position = index % clusterSize;
+
+        List<Address> members = new ArrayList<>();
+        for (int i=position; i<Config.SERVER_IPS.size(); i += clusterSize) {
+            if(i!=index){
+                members.add(Config.SERVER_IPS.get(i));
+            }
+        }
+        CopycatServer server = CopycatServer.builder(selfPaxosAddress, members)
+                .withTransport(new NettyTransport())
+                .withStateMachine(MapStateMachine::new)
+                .withStorage(new Storage("logs/" + host + paxosPort))
+                .build();
+        server.serializer().disableWhitelist();
+
+        server.open().join();
+    }
 
     private void acceptServers(){
         Runnable serverRunnable = new Runnable(){

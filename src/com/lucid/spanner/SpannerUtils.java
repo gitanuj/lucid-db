@@ -6,6 +6,7 @@ import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.util.List;
 
@@ -54,9 +55,11 @@ public class SpannerUtils {
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 
-    public static boolean isThisMyIpAddress(InetAddress addr) {
+    public static boolean isThisMyIpAddress(String host, int port) {
+        Address addr = new Address(host, port);
         // TODO: check if remote address is own ip address
-        if (addr.isAnyLocalAddress() || addr.isLoopbackAddress())
+        if (addr.socketAddress().getAddress().isAnyLocalAddress()
+                || addr.socketAddress().getAddress().isLoopbackAddress())
             return true;
         return false;
     }
