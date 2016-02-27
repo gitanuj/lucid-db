@@ -6,8 +6,6 @@ import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
 
 import java.io.ObjectOutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -26,14 +24,16 @@ public class SpannerClient {
         return result;
     }
 
-    public void executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound{
+    public boolean executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound{
         HashMap<String, Socket> sessionMap;
-        Socket socket;
+        Socket socket, coordinatorSocket = null;
         Scanner reader;
         ObjectOutputStream writer;
         HashMap<String, String> commands;
 
         if(command instanceof WriteCommand) {
+
+            // Determine leaders.
             sessionMap = new HashMap<>();
             commands = ((WriteCommand) command).getWriteCommands();
             for (Map.Entry entry : commands.entrySet()) {
@@ -42,7 +42,8 @@ public class SpannerClient {
                     try {
                         socket = new Socket(address.host(), address.port());
                         reader = new Scanner(new InputStreamReader(socket.getInputStream()));
-                        if (SpannerUtils.ROLE.values()[reader.nextInt()] == SpannerUtils.ROLE.LEADER) {
+                        if (SpannerUtils.ROLE.LEADER.equals(reader.nextLine())) { // TODO Clarify how to handle this
+                            SpannerUtils.root.debug("SpannerClient --> Leader for " + key + " is " + address.host());
                             sessionMap.put(key, socket);
                         }
                         else
@@ -54,17 +55,24 @@ public class SpannerClient {
                 if (sessionMap.get(key) == null)
                     throw new LeaderNotFound("Leader not found for key " + key);
             }
-
+            // Choose coordinator to be the first entry in session map.
+            // Send commit message to all leaders.
             try{
                 for(Map.Entry<String, Socket> entry : sessionMap.entrySet()){
                     socket = entry.getValue();
+                    if(coordinatorSocket == null) {
+                        coordinatorSocket = socket;
+                        SpannerUtils.root.debug("SpannerClient --> Coordinator for transaction " + ((WriteCommand) command).getTxn_id() + " is " + coordinatorSocket.getInetAddress().getHostAddress());
+                    }
                     writer = new ObjectOutputStream(socket.getOutputStream());
-                    writer.writeObject(new TransportObject(((WriteCommand) command).getTxn_id(), entry.getKey(), commands.get(entry.getKey())));
+                    writer.writeObject(new TransportObject(coordinatorSocket.getInetAddress(),((WriteCommand) command).getTxn_id(), entry.getKey(), commands.get(entry.getKey())));
                 }
             }
             catch(Exception e){
                 SpannerUtils.root.error(e.getMessage());
             }
+
+            // TODO Wait for response from coordinator.
         }
         else
            throw new UnexpectedCommand("Command not an instance of WriteCommand.");

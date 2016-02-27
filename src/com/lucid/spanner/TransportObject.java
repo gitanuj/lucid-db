@@ -1,20 +1,34 @@
 package com.lucid.spanner;
 
+import io.atomix.catalyst.transport.Address;
+
 import java.io.Serializable;
+import java.net.InetAddress;
 
 /**
- * Objects of this class will be serialised and sent from client to server.
+ * The commit message object: objects of this class will be serialised and sent from client to server.
  */
 public class TransportObject implements Serializable{
     private long txn_id;
     private String key;
     private String value;
+    private InetAddress coordinator;
 
-    public TransportObject(long id, String key, String value){
+    public TransportObject(InetAddress coord, long id, String key, String value){
         this.txn_id = id;
         this.key = key;
         this.value = value;
+        this.coordinator = coord;
     }
+
+    public InetAddress getCoordinator() {
+        return coordinator;
+    }
+
+    public void setCoordinator(InetAddress coordinator) {
+        this.coordinator = coordinator;
+    }
+
     public long getTxn_id() {
         return txn_id;
     }
