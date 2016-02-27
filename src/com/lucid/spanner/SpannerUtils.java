@@ -6,12 +6,17 @@ import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 
+import java.net.InetAddress;
 import java.util.List;
 
 public class SpannerUtils {
 
     public static enum ROLE{
-        COORDINATOR, LEADER,   COHORT
+        COORDINATOR, LEADER, COHORT
+    }
+
+    public static enum SERVER_MSG{
+        PREPAREACK, COMMIT
     }
 
     public static ch.qos.logback.classic.Logger root;
@@ -47,5 +52,20 @@ public class SpannerUtils {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         int index = key.hashCode() % Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
+    }
+
+    public static boolean isThisMyIpAddress(InetAddress addr) {
+        // TODO: check if remote address is own ip address
+        if (addr.isAnyLocalAddress() || addr.isLoopbackAddress())
+            return true;
+        return false;
+    }
+
+    public static Thread startThreadWithName(Runnable runnable, String name)
+    {
+        Thread thread = new Thread(runnable);
+        thread.setName(name);
+        thread.start();
+        return thread;
     }
 }
