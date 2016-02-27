@@ -11,7 +11,7 @@ public class WriteCommand implements Command<Object> {
         this.commands = map;
     }
 
-    public Object getWriteCommand() {
+    public HashMap<String, Object> getWriteCommands() {
         return this.commands;
     }
 }

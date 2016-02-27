@@ -10,6 +10,21 @@ import java.util.List;
 
 public class SpannerUtils {
 
+    public static final enum ROLE{
+        COORDINATOR(0), LEADER(1), COHORT(2)
+    }
+
+    public static ch.qos.logback.classic.Logger root;
+
+    public static void enableLogging() {
+        setLoggingLevel(ch.qos.logback.classic.Level.DEBUG);
+    }
+
+    public static void setLoggingLevel(ch.qos.logback.classic.Level level) {
+        root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+        root.setLevel(level);
+    }
+
     public static CopycatClient buildClient(List<Address> members) {
         CopycatClient client = CopycatClient.builder(members)
                 .withTransport(new NettyTransport())
