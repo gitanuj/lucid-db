@@ -26,7 +26,7 @@ public class SpannerClient {
         return result;
     }
 
-    public String executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound{
+    public String executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound, NoCoordinatorException{
         HashMap<String, Socket> sessionMap;
         HashMap<String, String> commands;
         HashMap<Socket, Map<String, String>> commitObject = new HashMap<>();
@@ -71,7 +71,7 @@ public class SpannerClient {
 
             // Prepare commit object for each leader
             for(Map.Entry<String, Socket> entry : sessionMap.entrySet()){
-                Map<String, String> map = commitObject.get(socket);
+                Map<String, String> map = commitObject.get(entry.getValue());
                 if(map != null)
                     map.put(entry.getKey(), commands.get(entry.getKey()));
                 else {
