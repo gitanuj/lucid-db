@@ -3,30 +3,20 @@ package com.lucid.spanner;
 import io.atomix.catalyst.transport.Address;
 
 import java.io.Serializable;
-import java.net.InetAddress;
+import java.util.Map;
 
 /**
  * The commit message object: objects of this class will be serialised and sent from client to server.
  */
 public class TransportObject implements Serializable{
     private long txn_id;
-    private String key;
-    private String value;
-    private InetAddress coordinator;
+    private Map<String, String> writeMap;
+    private Address coordinator;
 
-    public TransportObject(InetAddress coord, long id, String key, String value){
+    public TransportObject(Address coord, long id, Map<String, String> map){
         this.txn_id = id;
-        this.key = key;
-        this.value = value;
+        writeMap = map;
         this.coordinator = coord;
-    }
-
-    public InetAddress getCoordinator() {
-        return coordinator;
-    }
-
-    public void setCoordinator(InetAddress coordinator) {
-        this.coordinator = coordinator;
     }
 
     public long getTxn_id() {
@@ -37,20 +27,21 @@ public class TransportObject implements Serializable{
         this.txn_id = txn_id;
     }
 
-    public String getKey() {
-        return key;
+    public Map<String, String> getWriteMap() {
+        return writeMap;
     }
 
-    public void setKey(String key) {
-        this.key = key;
+    public void setWriteMap(Map<String, String> writeMap) {
+        this.writeMap = writeMap;
     }
 
-    public String getValue() {
-        return value;
+    public Address getCoordinator() {
+        return coordinator;
     }
 
-    public void setValue(String value) {
-        this.value = value;
+    public void setCoordinator(Address coordinator) {
+        this.coordinator = coordinator;
     }
+
 
 }
