@@ -3,15 +3,13 @@ package com.lucid.spanner;
 import com.lucid.test.MapStateMachine;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
+import io.atomix.catalyst.util.Hash;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -228,18 +226,29 @@ public class SpannerServer {
                         return;
                     }
 
-                    // TODO: Read Command from client (as JSON), Make sure this is PREPARE msg
+                    // Get de-serialized TransportObject from client
                     BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                     String inputLine = in.readLine();
 
+                    ObjectInputStream objStream = new ObjectInputStream(client.getInputStream());
                     TransportObject transportObject = null;
-                    // TODO: De-serialize Commit object, get tid
+                    try {
+                        transportObject = (TransportObject) objStream.readObject();
+                    } catch (ClassNotFoundException e) {
+                        logger.error("Recd something other than TransportObject");
+                        e.printStackTrace();
+                    }
 
-                    List <String> keys = new ArrayList<>();
-                    List <Object> values = new ArrayList<>();
-                    keys.add(transportObject.getKey());  // TODO: we should actually get list of keys and values
-                    values.add(transportObject.getValue());
                     tid = transportObject.getTxn_id();
+                    Map<String, String> writeMap = transportObject.getWriteMap();
+
+                    // TODO: extract key-values from writeMap
+                    List<String> keys = new ArrayList<>();
+                    List<String> values = new ArrayList<>();
+                    //keys.add(transportObject.getKey());
+                    //values.add(transportObject.getValue());
+
+                    // TODO: Select Keys for which this Leader if responsible
 
                     // Try to obtain locks (blocking)
                     obtainLocks(tid, keys);
@@ -266,9 +275,8 @@ public class SpannerServer {
                         }
                     }
                     else{
-                        // TODO: get coordinator IP from request and send PREPARE_ACK / PREPARENACK
-                        //Address coordAddr = new Address(transportObject.getCoordinator().host(), transportObject.getCoordinator().port());
-                        Address coordAddr = new Address("", 1234);
+                        // Get coordinator IP from request and send PREPARE_ACK / PREPARENACK
+                        Address coordAddr = new Address(transportObject.getCoordinator());
                         send2PCMsgSingle(SpannerUtils.SERVER_MSG.PREPARE_ACK, tid, coordAddr);
                     }
 
@@ -343,6 +351,7 @@ public class SpannerServer {
         CopycatClient client = CopycatClient.builder(paxosMembers)
                 .withTransport(new NettyTransport())
                 .build();
+        client.session();
         client.serializer().disableWhitelist();
 
         client.open().join();

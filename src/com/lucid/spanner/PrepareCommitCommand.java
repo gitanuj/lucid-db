@@ -7,9 +7,9 @@ import java.util.List;
 public class PrepareCommitCommand implements Command<Object> {
 
     private List<String> keys;
-    private List<Object> values;
+    private List<String> values;
 
-    public PrepareCommitCommand(List<String> keys, List<Object> values)
+    public PrepareCommitCommand(List<String> keys, List<String> values)
     {
         this.keys = keys;
         this.values = values;
