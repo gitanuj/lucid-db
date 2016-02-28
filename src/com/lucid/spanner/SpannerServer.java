@@ -221,7 +221,7 @@ public class SpannerServer {
                     int nShards = 0;
                     // Send my role to the client
                     PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-                    out.println(getMyRole());
+                    out.println(getMyRole().ordinal());
 
                     // Check if client closes connection now. Then cleanup and exit.
                     if(client.isClosed()){
