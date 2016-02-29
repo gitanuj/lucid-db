@@ -16,12 +16,15 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 public class SpannerServer {
 
     private int clientPort;
     private int serverPort;
     private int paxosPort;
+
+    volatile private CopycatServer.State role;
 
     List<Address> paxosMembers;
 
@@ -61,9 +64,9 @@ public class SpannerServer {
         Address selfPaxosAddress = new Address(host, paxosPort);
 
         int index = -1;
-        for (Address addr:Config.SERVER_IPS) {
+        for (Map.Entry addr:Config.SERVER_IPS.entrySet()) {
             index++;
-            if(SpannerUtils.isThisMyIpAddress(addr.host(), addr.port())){
+            if(SpannerUtils.isThisMyIpAddress(addr.getKey(), ((Map)addr.getValue()).){
                 break;
             }
         }
@@ -84,6 +87,13 @@ public class SpannerServer {
                 .withStateMachine(MapStateMachine::new)
                 .withStorage(new Storage("logs/" + host + paxosPort))
                 .build();
+
+        server.onStateChange(new Consumer<CopycatServer.State>() {
+            @Override
+            public void accept(CopycatServer.State state) {
+                role = state;
+            }
+        });
         server.serializer().disableWhitelist();
 
         server.open().join();
@@ -153,14 +163,14 @@ public class SpannerServer {
         tid = Integer.parseInt(msg[1]);
 
         if(msgType == SpannerUtils.SERVER_MSG.PREPARE_ACK){
-            if(!iAmCoordinator()){
+            if(!iAmCoordinator(tid)){
                 logger.error("PrepareAck recd at non-coordinator");
             }
             else
                 twoPC.recvPrepareAck(tid);
         }
         else if(msgType == SpannerUtils.SERVER_MSG.COMMIT) {
-            if(iAmCohort() || iAmCoordinator()){
+            if(!iAmLeader()){
                 logger.error("Commit recd at non-leader");
             }
             // Commit using Paxos in own cluster
@@ -171,7 +181,7 @@ public class SpannerServer {
             releaseLocks(tid);
         }
         else if(msgType == SpannerUtils.SERVER_MSG.PREPARE_NACK){
-            if(!iAmCoordinator()){
+            if(!iAmCoordinator(tid)){
                 logger.error("PrepareNack recd at non-coordinator");
             }
             else{
@@ -179,7 +189,7 @@ public class SpannerServer {
             }
         }
         else if(msgType == SpannerUtils.SERVER_MSG.ABORT){
-            if(iAmCohort() || iAmCoordinator()){
+            if(!iAmLeader()){
                 logger.error("Abort recd at non-leader");
             }
             // Abort using Paxos in own cluster
@@ -219,7 +229,7 @@ public class SpannerServer {
                     int nShards = 0;
                     // Send my role to the client
                     PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-                    out.println(getMyRole().ordinal());
+                    out.println(iAmLeader()? "1" : "0");
 
                     // Check if client closes connection now. Then cleanup and exit.
                     if(client.isClosed()){
@@ -247,24 +257,17 @@ public class SpannerServer {
                     tid = transportObject.getTxn_id();
                     Map<String, String> writeMap = transportObject.getWriteMap();
 
-                    // TODO: extract key-values from writeMap
-                    List<String> keys = new ArrayList<>();
-                    List<String> values = new ArrayList<>();
-                    //keys.add(transportObject.getKey());
-                    //values.add(transportObject.getValue());
-
-                    // TODO: Select Keys for which this Leader if responsible
-
                     // Try to obtain locks (blocking)
-                    obtainLocks(tid, keys);
+                    obtainLocks(tid, writeMap.keySet());
 
                     // Replicate PrepareCommitCommand using Paxos.
-                    PrepareCommitCommand prepCommand = new PrepareCommitCommand(keys, values);
+                    PrepareCommitCommand prepCommand = new PrepareCommitCommand(writeMap);
                     paxosReplicate(prepCommand);
 
                     // If I am coordinator, wait till all are prepared.
-                    if(iAmCoordinator()) {
-                        // TODO: Determine number of shards involved
+                    if(transportObject.isCoordinator()) {
+                        // Determine number of shards involved
+                        nShards = transportObject.getNumber_of_leaders();
                         twoPC.addNewTxn(tid, nShards);
                         twoPC.waitForPrepareAcks(tid);
                         Address clientAddr = new Address(client.getInetAddress().getHostName(), client.getPort());
@@ -281,6 +284,7 @@ public class SpannerServer {
                     }
                     else{
                         // Get coordinator IP from request and send PREPARE_ACK / PREPARENACK
+                        // TODO: get corresponding server port
                         Address coordAddr = new Address(transportObject.getCoordinator());
                         send2PCMsgSingle(SpannerUtils.SERVER_MSG.PREPARE_ACK, tid, coordAddr);
                     }
@@ -328,27 +332,11 @@ public class SpannerServer {
     }
 
     private boolean iAmLeader(){
-        SpannerUtils.ROLE role;
-        role = getMyRole();
-        return (role == SpannerUtils.ROLE.LEADER) || (role == SpannerUtils.ROLE.COORDINATOR);
+        return this.role == CopycatServer.State.LEADER;
     }
 
-    private boolean iAmCoordinator(){
-        SpannerUtils.ROLE role;
-        role = getMyRole();
-        return role == SpannerUtils.ROLE.COORDINATOR;
-    }
-
-    private boolean iAmCohort(){
-        SpannerUtils.ROLE role;
-        role = getMyRole();
-        return role == SpannerUtils.ROLE.COHORT;
-    }
-
-    public SpannerUtils.ROLE getMyRole(){
-        SpannerUtils.ROLE role = SpannerUtils.ROLE.COHORT;
-        // TODO: Determine own role
-        return role;
+    private boolean iAmCoordinator(long tid){
+        return twoPC.isActive(tid);
     }
 
     private void paxosReplicate(Command command){
@@ -398,7 +386,7 @@ public class SpannerServer {
         }
     }
 
-    private void obtainLocks(long tid, List<String> key){
+    private void obtainLocks(long tid, Set<String> key){
         // TODO: get locks
     }
 
