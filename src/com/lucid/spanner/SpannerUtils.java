@@ -49,9 +49,19 @@ public class SpannerUtils {
         return server;
     }
 
+    public static int getClusterID(Object key){
+        int index = key.hashCode() % Config.NUM_CLUSTERS;
+        return index;
+    }
+
     public static List<Address> getClusterIPs(Object key) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         int index = key.hashCode() % Config.NUM_CLUSTERS;
+        return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
+    }
+
+    public static List<Address> getClusterIPs(int index) {
+        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 

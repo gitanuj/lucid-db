@@ -234,8 +234,13 @@ public class SpannerServer {
                     TransportObject transportObject = null;
                     try {
                         transportObject = (TransportObject) objStream.readObject();
+                        if(transportObject == null)
+                            throw new NullPointerException();
                     } catch (ClassNotFoundException e) {
                         logger.error("Recd something other than TransportObject");
+                        e.printStackTrace();
+                    } catch (NullPointerException e){
+                        logger.error("Deserialized Transport object is null.");
                         e.printStackTrace();
                     }
 
@@ -358,12 +363,9 @@ public class SpannerServer {
 
         try {
             client.submit(command).get(Config.COMMAND_TIMEOUT, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
             e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        } catch (TimeoutException e) {
-            e.printStackTrace();
+            logger.error(e.toString());
         }
 
         client.close().join();
