@@ -18,10 +18,6 @@ import java.util.List;
 
 public class SpannerUtils {
 
-    public static enum ROLE{
-        COORDINATOR, LEADER, COHORT
-    }
-
     public enum SERVER_MSG{
         PREPARE_ACK, PREPARE_NACK, COMMIT, ABORT
     }
@@ -43,16 +39,6 @@ public class SpannerUtils {
                 .build();
         client.serializer().disableWhitelist();
         return client;
-    }
-
-    public static CopycatServer buildServer(Address selfAddress, List<Address> members) {
-        CopycatServer server = CopycatServer.builder(selfAddress, members)
-                .withTransport(new NettyTransport())
-                .withStateMachine(SpannerStateMachine::new)
-                .withStorage(new Storage("logs/" + selfAddress))
-                .build();
-        server.serializer().disableWhitelist();
-        return server;
     }
 
     public static int getClusterID(Object key){
@@ -79,7 +65,6 @@ public class SpannerUtils {
         if (host==getMyInternetIP()){
             return true;
         }
-
         return false;
     }
 

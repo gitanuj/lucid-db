@@ -63,7 +63,7 @@ public class SpannerServer {
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, paxosMembers)
                 .withTransport(new NettyTransport())
                 .withStateMachine(MapStateMachine::new)
-                .withStorage(new Storage("logs/" + host + paxosPort))
+                .withStorage(new Storage("logs/" + selfPaxosAddress))
                 .build();
 
         server.onStateChange(new Consumer<CopycatServer.State>() {
@@ -140,45 +140,53 @@ public class SpannerServer {
         String[] msg = inputLine.split(":");
         tid = Integer.parseInt(msg[1]);
 
-        if(msgType == SpannerUtils.SERVER_MSG.PREPARE_ACK){
-            if(!iAmCoordinator(tid)){
-                logger.error("PrepareAck recd at non-coordinator");
-            }
-            else
-                twoPC.recvPrepareAck(tid);
-        }
-        else if(msgType == SpannerUtils.SERVER_MSG.COMMIT) {
-            if(!iAmLeader()){
-                logger.error("Commit recd at non-leader");
-            }
-            // Commit using Paxos in own cluster
-            CommitCommand cmd = new CommitCommand(tid);
-            paxosReplicate(cmd);
+        switch (msgType){
+            case PREPARE_ACK:
+                if(!iAmCoordinator(tid)){
+                    logger.error("PrepareAck recd at non-coordinator");
+                }
+                else
+                    twoPC.recvPrepareAck(tid);
+                break;
 
-            // Release Locks
-            releaseLocks(tid);
-        }
-        else if(msgType == SpannerUtils.SERVER_MSG.PREPARE_NACK){
-            if(!iAmCoordinator(tid)){
-                logger.error("PrepareNack recd at non-coordinator");
-            }
-            else{
-                twoPC.recvPrepareAck(tid);
-            }
-        }
-        else if(msgType == SpannerUtils.SERVER_MSG.ABORT){
-            if(!iAmLeader()){
-                logger.error("Abort recd at non-leader");
-            }
-            // Abort using Paxos in own cluster
-            AbortCommand cmd = new AbortCommand(tid);
-            paxosReplicate(cmd);
+            case COMMIT:
+                if(!iAmLeader()){
+                    logger.error("Commit recd at non-leader");
+                }
+                // Commit using Paxos in own cluster
+                CommitCommand cmd = new CommitCommand(tid);
+                paxosReplicate(cmd);
 
-            // Release Locks
-            releaseLocks(tid);
+                // Release Locks
+                releaseLocks(tid);
+                break;
+
+            case PREPARE_NACK:
+                if(!iAmCoordinator(tid)){
+                    logger.error("PrepareNack recd at non-coordinator");
+                }
+                else{
+                    twoPC.recvPrepareAck(tid);
+                }
+                break;
+
+            case ABORT:
+                if(!iAmLeader()){
+                    logger.error("Abort recd at non-leader");
+                }
+                // Abort using Paxos in own cluster
+                AbortCommand acmd = new AbortCommand(tid);
+                paxosReplicate(acmd);
+
+                // Release Locks
+                releaseLocks(tid);
+                break;
+
+            default:
+                break;
         }
+
     }
-
 
     private void acceptClients(){
         Runnable clientRunnable = new Runnable(){
@@ -320,11 +328,7 @@ public class SpannerServer {
 
     private void paxosReplicate(Command command){
         // Create CopyCat client and replicate command
-        CopycatClient client = CopycatClient.builder(paxosMembers)
-                .withTransport(new NettyTransport())
-                .build();
-        client.session();
-        client.serializer().disableWhitelist();
+        CopycatClient client = SpannerUtils.buildClient(paxosMembers);
 
         client.open().join();
 
@@ -418,7 +422,7 @@ class TState{
 
 
 class TwoPC{
-    ConcurrentHashMap<Long, TState> txnState;
+    private ConcurrentHashMap<Long, TState> txnState;
     public ch.qos.logback.classic.Logger logger;
 
     public TwoPC(SpannerServer spannerServer, ch.qos.logback.classic.Logger logger){
