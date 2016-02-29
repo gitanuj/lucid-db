@@ -65,8 +65,10 @@ public class SpannerUtils {
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 
-    public static boolean isThisMyIpAddress(String host, int port) {
-        Address addr = new Address(host, port);
+    public static boolean isThisMyIpAddress(String host) {
+        if(host=="localhost")
+            return true;
+        Address addr = new Address(host, 10000);
         // TODO: check if remote address is own ip address
         if (addr.socketAddress().getAddress().isAnyLocalAddress()
                 || addr.socketAddress().getAddress().isLoopbackAddress())

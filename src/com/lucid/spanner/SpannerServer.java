@@ -66,9 +66,10 @@ public class SpannerServer {
         Address selfPaxosAddress = new Address(host, paxosPort);
 
         int index = -1;
-        for (Map.Entry addr:Config.SERVER_IPS.entrySet()) {
+        for (Address addr:Config.SERVER_IPS) {
             index++;
-            if(SpannerUtils.isThisMyIpAddress(addr.getKey(), ((Map)addr.getValue()).){
+            if(SpannerUtils.isThisMyIpAddress(addr.host())
+                    && paxosPort==Config.PAXOS_PORTS.get(index)){
                 break;
             }
         }
@@ -81,7 +82,7 @@ public class SpannerServer {
 
         for (int i=position; i<Config.SERVER_IPS.size(); i += clusterSize) {
             if(i!=index){
-                paxosMembers.add(Config.SERVER_IPS.get(i));
+                paxosMembers.add(new Address(Config.SERVER_IPS.get(i).host(), Config.PAXOS_PORTS.get(i)));
             }
         }
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, paxosMembers)
