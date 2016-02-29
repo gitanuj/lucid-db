@@ -24,7 +24,7 @@ public class SpannerClient {
         return result;
     }
 
-    public boolean executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound, NoCoordinatorException{
+    public boolean executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound, NoCoordinatorException {
         HashMap<Integer, Socket> sessionMap; // Maps cluster IDs to leader in cluster.
         HashMap<String, String> commands; // Key - Value map.
         HashMap<Socket, Map<String, String>> commitObject; // Maps leaders to map of key-value
@@ -41,6 +41,7 @@ public class SpannerClient {
             commands = ((WriteCommand) command).getWriteCommands();
             sMap = new HashMap<>();
             commitObject = new HashMap<>();
+
             // Accumulate keys mapped to the same clusters.
             for(Map.Entry entry : commands.entrySet()){
                 int clusterId = SpannerUtils.getClusterID(entry.getKey());
@@ -65,6 +66,7 @@ public class SpannerClient {
                         socket = new Socket(address.host(), address.port());
                         reader = new Scanner(new InputStreamReader(socket.getInputStream()));
                         if (reader.nextInt() == 1) {
+
                             // Choose coordinator.
                             if(coordinatorSocket == null) {
                                 coordinatorSocket = socket;

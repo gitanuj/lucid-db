@@ -1,5 +1,6 @@
 package com.lucid.spanner;
 
+import com.google.common.util.concurrent.Striped;
 import com.lucid.test.MapStateMachine;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
@@ -16,6 +17,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 
 public class SpannerServer {
@@ -386,11 +388,21 @@ public class SpannerServer {
         }
     }
 
-    private void obtainLocks(long tid, Set<String> key){
-        // TODO: get locks
+    private Lock[] obtainLocks(long tid, Set<String> keys){
+        int numberOfLocks = keys.size();
+        int counter = 0;
+        Lock[] locks = new Lock[numberOfLocks];
+        try {
+            for (String key : keys)
+                locks[counter++] = Locker.getLock(key);
+
+        finally{
+            for(Lock lock :locks)
+                lock.unlock();
+        }
     }
 
-    private void releaseLocks(long tid){
+    private void releaseLocks(Lock[] tid){
         if(!iAmLeader()){
             logger.debug("I am not a leader :/");
             return;
@@ -499,5 +511,16 @@ class TwoPC{
             return true;
         else
             return false;
+    }
+}
+
+public class Locker {
+    ​
+    private static final String LOG_TAG = "LOCKER";
+    ​
+    private static final Striped<Lock> sLock = Striped.lazyWeakLock(100);
+    ​
+    public static Lock getLock(String lockId) {
+        return sLock.get(lockId);
     }
 }
