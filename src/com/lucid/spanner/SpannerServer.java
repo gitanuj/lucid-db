@@ -4,17 +4,14 @@ import com.google.common.util.concurrent.Striped;
 import com.lucid.test.MapStateMachine;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
-import io.atomix.catalyst.util.Hash;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 
 import java.io.*;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
@@ -32,9 +29,6 @@ public class SpannerServer {
 
     private TwoPC twoPC;
     public ch.qos.logback.classic.Logger logger;
-
-    Map<Integer, Integer> txnPrepares;
-
 
     SpannerServer(int clientPort, int serverPort, int paxosPort) {
         this.clientPort = clientPort;
@@ -234,7 +228,7 @@ public class SpannerServer {
                         logger.error("Recd something other than TransportObject");
                         e.printStackTrace();
                     } catch (NullPointerException e){
-                        logger.error("Deserialized Transport object is null.");
+                        logger.error("De-serialized Transport object is null.");
                         e.printStackTrace();
                     }
 
@@ -268,8 +262,8 @@ public class SpannerServer {
                     }
                     else{
                         // Get coordinator IP from request and send PREPARE_ACK / PREPARENACK
-                        // TODO: get corresponding server port
                         AddressConfig coordPaxosAddr = (AddressConfig) transportObject.getCoordinator();
+                        // Get corresponding server port
                         Address coordServerAddr = new Address(coordPaxosAddr.host(), coordPaxosAddr.getServerPort());
                         send2PCMsgSingle(SpannerUtils.SERVER_MSG.PREPARE_ACK, tid, coordServerAddr);
                     }
@@ -371,7 +365,7 @@ public class SpannerServer {
         }
     }
 
-    private Lock[] obtainLocks(long tid, Set<String> keys){
+    private void obtainLocks(long tid, Set<String> keys) {
         int numberOfLocks = keys.size();
         int counter = 0;
         Lock[] locks = new Lock[numberOfLocks];
@@ -379,13 +373,15 @@ public class SpannerServer {
             for (String key : keys)
                 locks[counter++] = Locker.getLock(key);
 
-        finally{
-            for(Lock lock :locks)
-                lock.unlock();
         }
+        // TODO: Decide how to handle lock unlocks
+            finally{
+                for (Lock lock : locks)
+                    lock.unlock();
+            }
     }
 
-    private void releaseLocks(Lock[] tid){
+    private void releaseLocks(long tid){
         if(!iAmLeader()){
             logger.debug("I am not a leader :/");
             return;
@@ -497,12 +493,11 @@ class TwoPC{
     }
 }
 
-public class Locker {
-    ​
+class Locker {
     private static final String LOG_TAG = "LOCKER";
-    ​
+
     private static final Striped<Lock> sLock = Striped.lazyWeakLock(100);
-    ​
+
     public static Lock getLock(String lockId) {
         return sLock.get(lockId);
     }
