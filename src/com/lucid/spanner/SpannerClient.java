@@ -27,7 +27,7 @@ public class SpannerClient {
     public boolean executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound, NoCoordinatorException{
         HashMap<Integer, Socket> sessionMap; // Maps cluster IDs to leader in cluster.
         HashMap<String, String> commands; // Key - Value map.
-        HashMap<Socket, Map<String, String>> commitObject = new HashMap<>(); // Maps leaders to map of key-value
+        HashMap<Socket, Map<String, String>> commitObject; // Maps leaders to map of key-value
         // pairs of objects to commit in that cluster.
         HashMap<Integer, List<String>> sMap; // Maps cluster IDs to keys.
         Socket socket, coordinatorSocket = null;
@@ -40,17 +40,18 @@ public class SpannerClient {
             sessionMap = new HashMap<>();
             commands = ((WriteCommand) command).getWriteCommands();
             sMap = new HashMap<>();
-
+            commitObject = new HashMap<>();
             // Accumulate keys mapped to the same clusters.
             for(Map.Entry entry : commands.entrySet()){
                 int clusterId = SpannerUtils.getClusterID(entry.getKey());
-                if(sMap.get(clusterId) == null){
-                    List<String> list = new ArrayList<>();
+                List<String> list = sMap.get(clusterId);
+                if(list == null){
+                    list = new ArrayList<>();
                     list.add((String)entry.getKey());
                     sMap.put(clusterId, list);
                 }
                 else{
-                    List<String> list = sMap.get(clusterId);
+                    list = sMap.get(clusterId);
                     list.add((String)entry.getKey());
                     sMap.put(clusterId, list);
                 }
@@ -63,7 +64,7 @@ public class SpannerClient {
                     try {
                         socket = new Socket(address.host(), address.port());
                         reader = new Scanner(new InputStreamReader(socket.getInputStream()));
-                        if (SpannerUtils.ROLE.values()[reader.nextInt()] == SpannerUtils.ROLE.LEADER) {
+                        if (reader.nextInt() == 1) {
                             // Choose coordinator.
                             if(coordinatorSocket == null) {
                                 coordinatorSocket = socket;
@@ -87,17 +88,17 @@ public class SpannerClient {
             if(coordinatorSocket == null || coordinatorAddress == null)
                 throw new NoCoordinatorException();
 
-            // Prepare commit object for each leader
+            // Prepare commit object
             for(Map.Entry<Integer, Socket> entry : sessionMap.entrySet())
-                prepareCommitObjectForClusterID(entry.getKey(), entry.getValue(), commitObject, sMap, commands);
+                prepareCommitObjectWithClusterID(entry.getKey(), entry.getValue(), commitObject, sMap, commands);
 
             // Send commit message to all leaders.
             try{
                 for(Map.Entry<Socket, Map<String, String>> entry : commitObject.entrySet()){
                     socket = entry.getKey();
                     writer = new ObjectOutputStream(socket.getOutputStream());
-                    writer.writeObject(new TransportObject(coordinatorAddress,((WriteCommand) command).getTxn_id(),
-                            entry.getValue(), sMap.size()));
+                    writer.writeObject(new TransportObject(coordinatorAddress, ((WriteCommand) command).getTxn_id(),
+                            entry.getValue(), sMap.size(), coordinatorSocket == socket));
                     if(socket != coordinatorSocket)
                         socket.close(); // Close connections to all leaders but the coordinator.
                 }
@@ -121,8 +122,9 @@ public class SpannerClient {
            throw new UnexpectedCommand("Command not an instance of WriteCommand.");
     }
 
-    private void prepareCommitObjectForClusterID(int clusterID, Socket leader, HashMap<Socket, Map<String, String>>
+    private void prepareCommitObjectWithClusterID(int clusterID, Socket leader, HashMap<Socket, Map<String, String>>
             commitObject, Map<Integer, List<String>> sMap, Map<String, String> commands){
+
         Map<String, String> map = new HashMap<>();
 
         // Create map of key-value pairs for this cluster.

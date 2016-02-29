@@ -14,11 +14,14 @@ public class TransportObject implements Serializable{
     private Address coordinator;
     private int number_of_leaders;
 
-    public TransportObject(Address coord, long id, Map<String, String> map, int num){
+    private boolean isCoordinator;
+
+    public TransportObject(Address coord, long id, Map<String, String> map, int num, boolean isC){
         this.txn_id = id;
         writeMap = map;
         this.coordinator = coord;
         this.number_of_leaders = num;
+        this.isCoordinator = isC;
     }
 
     public int getNumber_of_leaders() {
@@ -27,6 +30,14 @@ public class TransportObject implements Serializable{
 
     public void setNumber_of_leaders(int number_of_leaders) {
         this.number_of_leaders = number_of_leaders;
+    }
+
+    public boolean isCoordinator() {
+        return isCoordinator;
+    }
+
+    public void setCoordinator(boolean coordinator) {
+        isCoordinator = coordinator;
     }
 
     public long getTxn_id() {
