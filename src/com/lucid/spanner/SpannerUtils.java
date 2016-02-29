@@ -6,8 +6,14 @@ import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 
 public class SpannerUtils {
@@ -65,15 +71,69 @@ public class SpannerUtils {
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 
-    public static boolean isThisMyIpAddress(String host) {
+    // Just checks is my ip is equal to given host, no port matching
+    public static boolean isThisMyIpAddress(String host)  {
         if(host=="localhost")
             return true;
-        Address addr = new Address(host, 10000);
-        // TODO: check if remote address is own ip address
-        if (addr.socketAddress().getAddress().isAnyLocalAddress()
-                || addr.socketAddress().getAddress().isLoopbackAddress())
+
+        if (host==getMyInternetIP()){
             return true;
+        }
+
         return false;
+    }
+
+    public static String getMyInternetIP(){
+        BufferedReader in = null;
+        String ip = "";
+        try {
+            URL whatismyip = new URL("http://checkip.amazonaws.com");
+            in = new BufferedReader(new InputStreamReader(
+                    whatismyip.openStream()));
+            ip = in.readLine(); //you get the IP as a String
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return ip;
+    }
+
+    public static int getMyPaxosAddressIndex(String host, int port){
+        int index = -1;
+        for(Address addr: Config.SERVER_IPS){
+            index++;
+            if(isThisMyIpAddress(addr.host()) && port==addr.port()){
+                break;
+            }
+        }
+        if(index>=Config.SERVER_IPS.size()){
+            return -1;
+        }
+        return index;
+    }
+
+    public static List<Address> getPaxosCluster(int index){
+        List<Address> paxosMembers = new ArrayList<Address>();
+        int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
+        int position = index % clusterSize;
+
+        for (int i=position; i<Config.SERVER_IPS.size(); i += clusterSize) {
+            if(i!=index){
+                paxosMembers.add(new Address(Config.SERVER_IPS.get(i)));
+            }
+        }
+        return paxosMembers;
+    }
+
+    public static List<Address> getPaxosClusterAll(int index){
+        List<Address> paxosMembers = new ArrayList<Address>();
+        int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
+        int position = index % clusterSize;
+
+        for (int i=position; i<Config.SERVER_IPS.size(); i += clusterSize) {
+                paxosMembers.add(new Address(Config.SERVER_IPS.get(i)));
+        }
+        return paxosMembers;
     }
 
     public static Thread startThreadWithName(Runnable runnable, String name)

@@ -56,35 +56,16 @@ public class SpannerServer {
     }
 
     private void startPaxosCluster() {
-        String host = null;
-        try {
-            host = InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
-            logger.error("UnknownHostException while starting paxos cluser.");
-            e.printStackTrace();
-        }
+        String host = SpannerUtils.getMyInternetIP();
         Address selfPaxosAddress = new Address(host, paxosPort);
 
-        int index = -1;
-        for (Address addr:Config.SERVER_IPS) {
-            index++;
-            if(SpannerUtils.isThisMyIpAddress(addr.host())
-                    && paxosPort==Config.PAXOS_PORTS.get(index)){
-                break;
-            }
-        }
-        if(index >= Config.SERVER_IPS.size()){
+        int index = SpannerUtils.getMyPaxosAddressIndex(host, paxosPort);
+        if(index == -1){
             logger.error("could not find own ip in IpList!!");
         }
 
-        int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
-        int position = index % clusterSize;
+        paxosMembers = SpannerUtils.getPaxosCluster(index);
 
-        for (int i=position; i<Config.SERVER_IPS.size(); i += clusterSize) {
-            if(i!=index){
-                paxosMembers.add(new Address(Config.SERVER_IPS.get(i).host(), Config.PAXOS_PORTS.get(i)));
-            }
-        }
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, paxosMembers)
                 .withTransport(new NettyTransport())
                 .withStateMachine(MapStateMachine::new)
@@ -288,8 +269,9 @@ public class SpannerServer {
                     else{
                         // Get coordinator IP from request and send PREPARE_ACK / PREPARENACK
                         // TODO: get corresponding server port
-                        Address coordAddr = new Address(transportObject.getCoordinator());
-                        send2PCMsgSingle(SpannerUtils.SERVER_MSG.PREPARE_ACK, tid, coordAddr);
+                        AddressConfig coordPaxosAddr = (AddressConfig) transportObject.getCoordinator();
+                        Address coordServerAddr = new Address(coordPaxosAddr.host(), coordPaxosAddr.getServerPort());
+                        send2PCMsgSingle(SpannerUtils.SERVER_MSG.PREPARE_ACK, tid, coordServerAddr);
                     }
 
                 } catch (IOException e) {
