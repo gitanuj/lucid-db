@@ -63,7 +63,7 @@ public class SpannerClient {
                 int clusterId= (Integer)entry.getKey();
                 for (Address address : SpannerUtils.getClusterIPs(clusterId)) {
                     try {
-                        socket = new Socket(address.host(), address.port());
+                        socket = new Socket(address.host(), ((AddressConfig)address).getClientPort());
                         reader = new Scanner(new InputStreamReader(socket.getInputStream()));
                         if (reader.nextInt() == 1) {
 
