@@ -1,5 +1,6 @@
 package com.lucid.ycsb;
 
+import com.lucid.common.LogUtils;
 import com.lucid.spanner.SpannerClient;
 import com.lucid.spanner.WriteCommand;
 
@@ -10,6 +11,8 @@ import java.util.Map;
 import java.util.concurrent.*;
 
 public class Batcher {
+
+    private static final String LOG_TAG = "BATCHER";
 
     private static final Batcher INSTANCE = new Batcher();
 
@@ -51,7 +54,7 @@ public class Batcher {
         try {
             waitToComplete(txnId);
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.error(LOG_TAG, "Something went wrong while waiting", e);
             return false;
         }
         return checkResult();
@@ -77,7 +80,7 @@ public class Batcher {
                     try {
                         handler.cancel(true);
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        LogUtils.error(LOG_TAG, "Failed to cancel BatchProcessor on timeout", e);
                     }
                 }, REQUEST_TIMEOUT, TimeUnit.MILLISECONDS);
             }
@@ -169,7 +172,7 @@ public class Batcher {
             try {
                 notifyCompletion(txnId, result);
             } catch (Exception e) {
-                e.printStackTrace();
+                LogUtils.error(LOG_TAG, "Failed to notify completion", e);
             }
         }
     }
