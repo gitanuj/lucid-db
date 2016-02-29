@@ -12,11 +12,21 @@ public class TransportObject implements Serializable{
     private long txn_id;
     private Map<String, String> writeMap;
     private Address coordinator;
+    private int number_of_leaders;
 
-    public TransportObject(Address coord, long id, Map<String, String> map){
+    public TransportObject(Address coord, long id, Map<String, String> map, int num){
         this.txn_id = id;
         writeMap = map;
         this.coordinator = coord;
+        this.number_of_leaders = num;
+    }
+
+    public int getNumber_of_leaders() {
+        return number_of_leaders;
+    }
+
+    public void setNumber_of_leaders(int number_of_leaders) {
+        this.number_of_leaders = number_of_leaders;
     }
 
     public long getTxn_id() {
