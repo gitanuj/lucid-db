@@ -2,15 +2,15 @@ package com.lucid.spanner;
 
 import io.atomix.copycat.Query;
 
-public class ReadQuery implements Query<Object> {
+public class ReadQuery implements Query<String> {
 
-    private final Object key;
+    private final String key;
 
-    public ReadQuery(Object key) {
+    public ReadQuery(String key) {
         this.key = key;
     }
 
-    public Object key() {
+    public String key() {
         return key;
     }
 }

@@ -4,17 +4,14 @@ import com.google.common.util.concurrent.Striped;
 import com.lucid.test.MapStateMachine;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
-import io.atomix.catalyst.util.Hash;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 
 import java.io.*;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
@@ -32,9 +29,6 @@ public class SpannerServer {
 
     private TwoPC twoPC;
     public ch.qos.logback.classic.Logger logger;
-
-    Map<Integer, Integer> txnPrepares;
-
 
     SpannerServer(int clientPort, int serverPort, int paxosPort) {
         this.clientPort = clientPort;
@@ -69,7 +63,7 @@ public class SpannerServer {
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, paxosMembers)
                 .withTransport(new NettyTransport())
                 .withStateMachine(MapStateMachine::new)
-                .withStorage(new Storage("logs/" + host + paxosPort))
+                .withStorage(new Storage("logs/" + selfPaxosAddress))
                 .build();
 
         server.onStateChange(new Consumer<CopycatServer.State>() {
@@ -146,45 +140,53 @@ public class SpannerServer {
         String[] msg = inputLine.split(":");
         tid = Integer.parseInt(msg[1]);
 
-        if(msgType == SpannerUtils.SERVER_MSG.PREPARE_ACK){
-            if(!iAmCoordinator(tid)){
-                logger.error("PrepareAck recd at non-coordinator");
-            }
-            else
-                twoPC.recvPrepareAck(tid);
-        }
-        else if(msgType == SpannerUtils.SERVER_MSG.COMMIT) {
-            if(!iAmLeader()){
-                logger.error("Commit recd at non-leader");
-            }
-            // Commit using Paxos in own cluster
-            CommitCommand cmd = new CommitCommand(tid);
-            paxosReplicate(cmd);
+        switch (msgType){
+            case PREPARE_ACK:
+                if(!iAmCoordinator(tid)){
+                    logger.error("PrepareAck recd at non-coordinator");
+                }
+                else
+                    twoPC.recvPrepareAck(tid);
+                break;
 
-            // Release Locks
-            releaseLocks(tid);
-        }
-        else if(msgType == SpannerUtils.SERVER_MSG.PREPARE_NACK){
-            if(!iAmCoordinator(tid)){
-                logger.error("PrepareNack recd at non-coordinator");
-            }
-            else{
-                twoPC.recvPrepareAck(tid);
-            }
-        }
-        else if(msgType == SpannerUtils.SERVER_MSG.ABORT){
-            if(!iAmLeader()){
-                logger.error("Abort recd at non-leader");
-            }
-            // Abort using Paxos in own cluster
-            AbortCommand cmd = new AbortCommand(tid);
-            paxosReplicate(cmd);
+            case COMMIT:
+                if(!iAmLeader()){
+                    logger.error("Commit recd at non-leader");
+                }
+                // Commit using Paxos in own cluster
+                CommitCommand cmd = new CommitCommand(tid);
+                paxosReplicate(cmd);
 
-            // Release Locks
-            releaseLocks(tid);
+                // Release Locks
+                releaseLocks(tid);
+                break;
+
+            case PREPARE_NACK:
+                if(!iAmCoordinator(tid)){
+                    logger.error("PrepareNack recd at non-coordinator");
+                }
+                else{
+                    twoPC.recvPrepareAck(tid);
+                }
+                break;
+
+            case ABORT:
+                if(!iAmLeader()){
+                    logger.error("Abort recd at non-leader");
+                }
+                // Abort using Paxos in own cluster
+                AbortCommand acmd = new AbortCommand(tid);
+                paxosReplicate(acmd);
+
+                // Release Locks
+                releaseLocks(tid);
+                break;
+
+            default:
+                break;
         }
+
     }
-
 
     private void acceptClients(){
         Runnable clientRunnable = new Runnable(){
@@ -234,7 +236,7 @@ public class SpannerServer {
                         logger.error("Recd something other than TransportObject");
                         e.printStackTrace();
                     } catch (NullPointerException e){
-                        logger.error("Deserialized Transport object is null.");
+                        logger.error("De-serialized Transport object is null.");
                         e.printStackTrace();
                     }
 
@@ -268,8 +270,8 @@ public class SpannerServer {
                     }
                     else{
                         // Get coordinator IP from request and send PREPARE_ACK / PREPARENACK
-                        // TODO: get corresponding server port
                         AddressConfig coordPaxosAddr = (AddressConfig) transportObject.getCoordinator();
+                        // Get corresponding server port
                         Address coordServerAddr = new Address(coordPaxosAddr.host(), coordPaxosAddr.getServerPort());
                         send2PCMsgSingle(SpannerUtils.SERVER_MSG.PREPARE_ACK, tid, coordServerAddr);
                     }
@@ -326,11 +328,7 @@ public class SpannerServer {
 
     private void paxosReplicate(Command command){
         // Create CopyCat client and replicate command
-        CopycatClient client = CopycatClient.builder(paxosMembers)
-                .withTransport(new NettyTransport())
-                .build();
-        client.session();
-        client.serializer().disableWhitelist();
+        CopycatClient client = SpannerUtils.buildClient(paxosMembers);
 
         client.open().join();
 
@@ -371,7 +369,7 @@ public class SpannerServer {
         }
     }
 
-    private Lock[] obtainLocks(long tid, Set<String> keys){
+    private void obtainLocks(long tid, Set<String> keys) {
         int numberOfLocks = keys.size();
         int counter = 0;
         Lock[] locks = new Lock[numberOfLocks];
@@ -379,13 +377,15 @@ public class SpannerServer {
             for (String key : keys)
                 locks[counter++] = Locker.getLock(key);
 
-        finally{
-            for(Lock lock :locks)
-                lock.unlock();
         }
+        // TODO: Decide how to handle lock unlocks
+            finally{
+                for (Lock lock : locks)
+                    lock.unlock();
+            }
     }
 
-    private void releaseLocks(Lock[] tid){
+    private void releaseLocks(long tid){
         if(!iAmLeader()){
             logger.debug("I am not a leader :/");
             return;
@@ -422,7 +422,7 @@ class TState{
 
 
 class TwoPC{
-    ConcurrentHashMap<Long, TState> txnState;
+    private ConcurrentHashMap<Long, TState> txnState;
     public ch.qos.logback.classic.Logger logger;
 
     public TwoPC(SpannerServer spannerServer, ch.qos.logback.classic.Logger logger){
@@ -497,12 +497,11 @@ class TwoPC{
     }
 }
 
-public class Locker {
-    ​
+class Locker {
     private static final String LOG_TAG = "LOCKER";
-    ​
+
     private static final Striped<Lock> sLock = Striped.lazyWeakLock(100);
-    ​
+
     public static Lock getLock(String lockId) {
         return sLock.get(lockId);
     }

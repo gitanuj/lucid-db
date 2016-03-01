@@ -26,7 +26,7 @@ public class SpannerClient {
 
     public boolean executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound, NoCoordinatorException {
         HashMap<Integer, Socket> sessionMap; // Maps cluster IDs to leader in cluster.
-        HashMap<String, String> commands; // Key - Value map.
+        Map<String, String> commands; // Key - Value map.
         HashMap<Socket, Map<String, String>> commitObject; // Maps leaders to map of key-value
         // pairs of objects to commit in that cluster.
         HashMap<Integer, List<String>> sMap; // Maps cluster IDs to keys.
