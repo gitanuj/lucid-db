@@ -76,6 +76,9 @@ public class SpannerClient {
                             SpannerUtils.root.debug("SpannerClient --> Leader for Cluster ID " + clusterId + " is " +
                                     address.host());
                             sessionMap.put(clusterId, socket);
+
+                            // Leader found.
+                            break;
                         }
                         else
                             socket.close();
