@@ -61,6 +61,7 @@ public class SpannerServer {
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
+        host = "192.168.0.11";
         Address selfPaxosAddress = new Address(host, paxosPort);
 
         int index = SpannerUtils.getMyPaxosAddressIndex(host, paxosPort);
@@ -72,8 +73,9 @@ public class SpannerServer {
 
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, SpannerUtils.toAddress(paxosMembers))
                 .withTransport(new NettyTransport())
-                .withStateMachine(MapStateMachine::new)
-                .withStorage(Storage.builder().withStorageLevel(StorageLevel.MEMORY).build())
+                .withStateMachine(SpannerStateMachine::new)
+                .withStorage(Storage.builder().withStorageLevel(StorageLevel.MEMORY).
+                        withDirectory(String.valueOf(paxosPort)).build())
                 .build();
 
         server.onStateChange(new Consumer<CopycatServer.State>() {
@@ -203,8 +205,8 @@ public class SpannerServer {
             @Override
             public void run(){
                 try {
+                    ServerSocket serverSocket = new ServerSocket(clientPort);
                     while(true) {
-                        ServerSocket serverSocket = new ServerSocket(clientPort);
                         Socket client = serverSocket.accept();
                         handleClientAccept(client);
                     }
@@ -233,8 +235,8 @@ public class SpannerServer {
                     }
 
                     // Get de-serialized TransportObject from client
-                    BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-                    String inputLine = in.readLine();
+                    //BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+                    //String inputLine = in.readLine();
 
                     ObjectInputStream objStream = new ObjectInputStream(client.getInputStream());
                     TransportObject transportObject = null;
@@ -313,6 +315,8 @@ public class SpannerServer {
 
     }
 
+
+
     private void handlePrepareNack(long tid){
         // (Abort locally) Do Paxos in own cluster for AbortMsg
         AbortCommand cmd = new AbortCommand(tid);
@@ -384,8 +388,11 @@ public class SpannerServer {
         int counter = 0;
         Lock[] locks = new Lock[numberOfLocks];
         try {
-            for (String key : keys)
-                locks[counter++] = Locker.getLock(key);
+            for (String key : keys) {
+                locks[counter] = Locker.getLock(key);
+                locks[counter].lock();
+                counter++;
+            }
 
         }
         // TODO: Decide how to handle lock unlocks
