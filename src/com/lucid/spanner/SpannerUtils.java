@@ -42,13 +42,13 @@ public class SpannerUtils {
     }
 
     public static int getClusterID(Object key){
-        int index = key.hashCode() % Config.NUM_CLUSTERS;
+        int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
         return index;
     }
 
     public static List<Address> getClusterIPs(Object key) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        int index = key.hashCode() % Config.NUM_CLUSTERS;
+        int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 
@@ -102,10 +102,11 @@ public class SpannerUtils {
         int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
         int position = index % clusterSize;
 
-        for (int i=position; i<Config.SERVER_IPS.size(); i += clusterSize) {
-            if(i!=index){
-                paxosMembers.add(new Address(Config.SERVER_IPS.get(i)));
+        for (int i=0; i<clusterSize; i++) {
+            if(position!=index){
+                paxosMembers.add(new Address(Config.SERVER_IPS.get(position)));
             }
+            position = (position+Config.NUM_CLUSTERS)%Config.SERVER_IPS.size();
         }
         return paxosMembers;
     }

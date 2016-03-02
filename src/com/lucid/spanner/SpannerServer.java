@@ -30,7 +30,7 @@ public class SpannerServer {
     private TwoPC twoPC;
     public ch.qos.logback.classic.Logger logger;
 
-    SpannerServer(int clientPort, int serverPort, int paxosPort) {
+    SpannerServer(int paxosPort, int clientPort, int serverPort) {
         this.clientPort = clientPort;
         this.serverPort = serverPort;
         this.paxosPort = paxosPort;
@@ -50,7 +50,8 @@ public class SpannerServer {
     }
 
     private void startPaxosCluster() {
-        String host = SpannerUtils.getMyInternetIP();
+        //String host = SpannerUtils.getMyInternetIP();
+        String host = "localhost";
         Address selfPaxosAddress = new Address(host, paxosPort);
 
         int index = SpannerUtils.getMyPaxosAddressIndex(host, paxosPort);
@@ -58,7 +59,7 @@ public class SpannerServer {
             logger.error("could not find own ip in IpList!!");
         }
 
-        paxosMembers = SpannerUtils.getPaxosCluster(index);
+        paxosMembers = SpannerUtils.getPaxosCluster(index); // Excludes own ip
 
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, paxosMembers)
                 .withTransport(new NettyTransport())
@@ -394,6 +395,23 @@ public class SpannerServer {
     }
 
     public static void main(String[] args) {
+        List <Thread> threads = new ArrayList<>();
+        for(Address addr : Config.SERVER_IPS){
+            Thread thread = new Thread(() -> {
+                SpannerServer server = new SpannerServer(addr.port(), ((AddressConfig)addr).getClientPort(),
+                        ((AddressConfig)addr).getServerPort());
+            }
+            );
+            thread.start();
+            threads.add(thread);
+        }
+        for(Thread thread:threads){
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
 
     }
 }
