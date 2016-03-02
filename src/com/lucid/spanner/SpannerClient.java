@@ -1,5 +1,6 @@
 package com.lucid.spanner;
 
+import com.lucid.common.LogUtils;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
@@ -15,6 +16,8 @@ import java.net.Socket;
 import java.io.InputStreamReader;
 
 public class SpannerClient {
+
+    private static final String LOG_TAG = "SPANNER_CLIENT";
 
     public String executeQuery(Query query) throws InterruptedException, ExecutionException, TimeoutException {
         CopycatClient client = SpannerUtils.buildClient(Config.SERVER_IPS);
@@ -83,7 +86,7 @@ public class SpannerClient {
                         else
                             socket.close();
                     } catch (Exception e) {
-                        SpannerUtils.root.error(e.getMessage());
+                        LogUtils.error(LOG_TAG, "Something went wrong", e);
                     }
                 }
                 if (sessionMap.get(clusterId) == null)

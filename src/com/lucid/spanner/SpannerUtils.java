@@ -22,14 +22,13 @@ public class SpannerUtils {
         PREPARE_ACK, PREPARE_NACK, COMMIT, ABORT
     }
 
-    public static ch.qos.logback.classic.Logger root;
+    public static ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
 
     public static void enableLogging() {
         setLoggingLevel(ch.qos.logback.classic.Level.DEBUG);
     }
 
     public static void setLoggingLevel(ch.qos.logback.classic.Level level) {
-        root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
         root.setLevel(level);
     }
 

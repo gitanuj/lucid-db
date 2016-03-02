@@ -2,6 +2,7 @@ package com.lucid.ycsb;
 
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.RandomByteIterator;
+import com.yahoo.ycsb.Status;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,11 +21,15 @@ public class SpannerDBTester {
         SpannerDB spannerDB = new SpannerDB();
 
         // TODO Fails test for 1000 threads. Investigate!
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 1; i++) {
             final int id = i;
             Thread t = new Thread(() -> {
-                spannerDB.insert("table", String.valueOf(id), generateRandomValues());
-                System.out.println(id);
+                String table = "table";
+                String key = "key" + String.valueOf(id);
+                HashMap<String, ByteIterator> values = new HashMap<>();
+
+                Status status = spannerDB.read(table, key, null, values);
+                System.out.println(id + " read: " + status);
             });
             THREADS.add(t);
         }

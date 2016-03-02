@@ -11,7 +11,7 @@ import java.util.Map;
 
 public class SpannerStateMachine extends StateMachine implements Snapshottable {
 
-    private Map<Object, Object> map = new HashMap<>();
+    private Map<String, String> map = new HashMap<>();
 
     @Override
     public void snapshot(SnapshotWriter writer) {
@@ -27,17 +27,19 @@ public class SpannerStateMachine extends StateMachine implements Snapshottable {
 
     public void write(Commit<WriteCommand> commit) {
         try {
-            // TODO
-            return;
+            Map<String, String> map = commit.operation().getWriteCommands();
+            for (String key : map.keySet()) {
+                map.put(key, map.get(key));
+            }
         } finally {
             commit.close();
         }
     }
 
-    public void read(Commit<ReadQuery> commit) {
+    public String read(Commit<ReadQuery> commit) {
         try {
-            // TODO
-            return;
+            String key = commit.operation().key();
+            return map.get(key);
         } finally {
             commit.close();
         }

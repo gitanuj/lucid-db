@@ -14,12 +14,12 @@ public final class Config {
     public static final List<Address> SERVER_IPS = new ArrayList<>();
 
     static {
-        SERVER_IPS.add(new AddressConfig("localhost", 9000, 9100, 9200));
-        SERVER_IPS.add(new AddressConfig("localhost", 9001, 9101, 9201));
+        SERVER_IPS.add(new AddressConfig("192.168.0.11", 9000, 9100, 9200));
+        SERVER_IPS.add(new AddressConfig("192.168.0.11", 9001, 9101, 9201));
         //SERVER_IPS.add(new AddressConfig("localhost", 9002, 9102, 9202));
         //SERVER_IPS.add(new AddressConfig("localhost", 9003, 9103, 9203));
     }
 
-    public static final long READ_QUERY_TIMEOUT = 5 * 1000;
+    public static final long READ_QUERY_TIMEOUT = 10 * 1000;
     public static final long COMMAND_TIMEOUT = 5 * 1000;
 }
