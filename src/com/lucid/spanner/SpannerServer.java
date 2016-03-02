@@ -8,6 +8,7 @@ import io.atomix.copycat.Command;
 import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
+import io.atomix.copycat.server.storage.StorageLevel;
 
 import java.io.*;
 import java.net.InetAddress;
@@ -72,7 +73,7 @@ public class SpannerServer {
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, paxosMembers)
                 .withTransport(new NettyTransport())
                 .withStateMachine(MapStateMachine::new)
-                .withStorage(new Storage("logs/" + selfPaxosAddress))
+                .withStorage(Storage.builder().withStorageLevel(StorageLevel.MEMORY).build())
                 .build();
 
         server.onStateChange(new Consumer<CopycatServer.State>() {
