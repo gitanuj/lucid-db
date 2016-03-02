@@ -2,6 +2,7 @@ package com.lucid.spanner;
 
 import com.google.common.util.concurrent.Striped;
 import com.lucid.test.MapStateMachine;
+import com.lucid.test.Utils;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
 import io.atomix.copycat.Command;
@@ -22,6 +23,8 @@ import java.util.function.Consumer;
 
 public class SpannerServer {
 
+    private int index;
+    private String host;
     private int clientPort;
     private int serverPort;
     private int paxosPort;
@@ -33,10 +36,12 @@ public class SpannerServer {
     private TwoPC twoPC;
     public ch.qos.logback.classic.Logger logger;
 
-    SpannerServer(int paxosPort, int clientPort, int serverPort) {
-        this.clientPort = clientPort;
-        this.serverPort = serverPort;
-        this.paxosPort = paxosPort;
+    SpannerServer(AddressConfig addressConfig, int index) {
+        this.index = index;
+        this.host = addressConfig.host();
+        this.serverPort = addressConfig.getServerPort();
+        this.clientPort = addressConfig.getClientPort();
+        this.paxosPort = addressConfig.port();
         logger = SpannerUtils.root;
         twoPC = new TwoPC(this, logger);
         paxosMembers = new ArrayList<>();
@@ -53,23 +58,9 @@ public class SpannerServer {
     }
 
     private void startPaxosCluster() {
-        //String host = SpannerUtils.getMyInternetIP();
-        //String host = "localhost";
-        String host = null;
-        try {
-            host = InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        }
-        host = "192.168.0.11";
         Address selfPaxosAddress = new Address(host, paxosPort);
 
-        int index = SpannerUtils.getMyPaxosAddressIndex(host, paxosPort);
-        if(index == -1){
-            logger.error("could not find own ip in IpList!!");
-        }
-
-        paxosMembers = SpannerUtils.getPaxosClusterAll(index); // Excludes own ip
+        paxosMembers = SpannerUtils.getPaxosClusterAll(index);
 
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, SpannerUtils.toAddress(paxosMembers))
                 .withTransport(new NettyTransport())
@@ -230,7 +221,8 @@ public class SpannerServer {
                     out.println(iAmLeader()? "1" : "0");
 
                     // Check if client closes connection now. Then cleanup and exit.
-                    if(client.isClosed()){
+                    if(!iAmLeader()){
+                        com.lucid.common.Utils.closeQuietly(client);
                         return;
                     }
 
@@ -288,7 +280,7 @@ public class SpannerServer {
                         send2PCMsgSingle(SpannerUtils.SERVER_MSG.PREPARE_ACK, tid, coordServerAddr);
                     }
 
-                } catch (IOException e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
@@ -411,8 +403,9 @@ public class SpannerServer {
     }
 
     public static void main(String[] args) {
-        SpannerServer server = new SpannerServer(Integer.parseInt(args[0]),
-                Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+        int index = Integer.parseInt(args[0]);
+        AddressConfig config = Config.SERVER_IPS.get(index);
+        SpannerServer server = new SpannerServer(config, index);
         /*List <Thread> threads = new ArrayList<>();
         for(Address addr : Config.SERVER_IPS){
             Thread thread = new Thread(() -> {

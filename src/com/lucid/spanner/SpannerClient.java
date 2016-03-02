@@ -111,7 +111,7 @@ public class SpannerClient {
                 }
             }
             catch(Exception e){
-                SpannerUtils.root.error(e.getMessage());
+                LogUtils.error(LOG_TAG, "Something went wrong", e);
             }
 
             // Wait for response from coordinator, and pass it on to caller.

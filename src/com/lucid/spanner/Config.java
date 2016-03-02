@@ -2,6 +2,7 @@ package com.lucid.spanner;
 
 import io.atomix.catalyst.transport.Address;
 
+import java.net.InetAddress;
 import java.util.*;
 
 public final class Config {
@@ -14,8 +15,13 @@ public final class Config {
     public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
 
     static {
-        SERVER_IPS.add(new AddressConfig("192.168.0.11", 9000, 9100, 9200));
-        SERVER_IPS.add(new AddressConfig("192.168.0.11", 9001, 9101, 9201));
+        String host = "192.168.0.55";
+//        try {
+//            host = InetAddress.getLocalHost().getHostName();
+//        } catch (Exception e) {}
+
+        SERVER_IPS.add(new AddressConfig(host, 9000, 9100, 9200));
+        SERVER_IPS.add(new AddressConfig(host, 9001, 9101, 9201));
         //SERVER_IPS.add(new AddressConfig("localhost", 9002, 9102, 9202));
         //SERVER_IPS.add(new AddressConfig("localhost", 9003, 9103, 9203));
     }

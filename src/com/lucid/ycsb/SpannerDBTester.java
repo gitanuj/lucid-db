@@ -26,10 +26,10 @@ public class SpannerDBTester {
             Thread t = new Thread(() -> {
                 String table = "table";
                 String key = "key" + String.valueOf(id);
-                HashMap<String, ByteIterator> values = new HashMap<>();
+                HashMap<String, ByteIterator> values = generateRandomValues();
 
-                Status status = spannerDB.read(table, key, null, values);
-                System.out.println(id + " read: " + status);
+                Status status = spannerDB.insert(table, key, values);
+                System.out.println(id + " write: " + status);
             });
             THREADS.add(t);
         }
