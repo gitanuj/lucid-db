@@ -9,15 +9,15 @@ public final class Config {
     private Config() {
     }
 
-    public static final int NUM_CLUSTERS = 2;
+    public static final int NUM_CLUSTERS = 1;
 
     public static final List<Address> SERVER_IPS = new ArrayList<>();
 
     static {
-        SERVER_IPS.add(new AddressConfig("localhost", 8888, 9100, 9200));
-        SERVER_IPS.add(new AddressConfig("localhost", 8888, 9101, 9201));
-        SERVER_IPS.add(new AddressConfig("localhost", 8888, 9102, 9202));
-        SERVER_IPS.add(new AddressConfig("localhost", 8888, 9103, 9203));
+        SERVER_IPS.add(new AddressConfig("localhost", 9000, 9100, 9200));
+        SERVER_IPS.add(new AddressConfig("localhost", 9001, 9101, 9201));
+        //SERVER_IPS.add(new AddressConfig("localhost", 9002, 9102, 9202));
+        //SERVER_IPS.add(new AddressConfig("localhost", 9003, 9103, 9203));
     }
 
     public static final long READ_QUERY_TIMEOUT = 5 * 1000;

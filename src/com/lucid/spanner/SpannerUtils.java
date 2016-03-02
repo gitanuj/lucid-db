@@ -116,8 +116,9 @@ public class SpannerUtils {
         int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
         int position = index % clusterSize;
 
-        for (int i=position; i<Config.SERVER_IPS.size(); i += clusterSize) {
-                paxosMembers.add(new Address(Config.SERVER_IPS.get(i)));
+        for (int i=0; i<clusterSize; i++) {
+                paxosMembers.add(new Address(Config.SERVER_IPS.get(position)));
+            position = (position+Config.NUM_CLUSTERS)%Config.SERVER_IPS.size();
         }
         return paxosMembers;
     }

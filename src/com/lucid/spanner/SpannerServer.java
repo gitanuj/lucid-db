@@ -10,8 +10,10 @@ import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 
 import java.io.*;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
@@ -51,7 +53,13 @@ public class SpannerServer {
 
     private void startPaxosCluster() {
         //String host = SpannerUtils.getMyInternetIP();
-        String host = "localhost";
+        //String host = "localhost";
+        String host = null;
+        try {
+            host = InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
         Address selfPaxosAddress = new Address(host, paxosPort);
 
         int index = SpannerUtils.getMyPaxosAddressIndex(host, paxosPort);
@@ -59,7 +67,7 @@ public class SpannerServer {
             logger.error("could not find own ip in IpList!!");
         }
 
-        paxosMembers = SpannerUtils.getPaxosCluster(index); // Excludes own ip
+        paxosMembers = SpannerUtils.getPaxosClusterAll(index); // Excludes own ip
 
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, paxosMembers)
                 .withTransport(new NettyTransport())
@@ -395,7 +403,9 @@ public class SpannerServer {
     }
 
     public static void main(String[] args) {
-        List <Thread> threads = new ArrayList<>();
+        SpannerServer server = new SpannerServer(Integer.parseInt(args[0]),
+                Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+        /*List <Thread> threads = new ArrayList<>();
         for(Address addr : Config.SERVER_IPS){
             Thread thread = new Thread(() -> {
                 SpannerServer server = new SpannerServer(addr.port(), ((AddressConfig)addr).getClientPort(),
@@ -411,7 +421,7 @@ public class SpannerServer {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-        }
+        }*/
 
     }
 }
