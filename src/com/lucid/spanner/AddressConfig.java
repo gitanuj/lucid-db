@@ -2,7 +2,9 @@ package com.lucid.spanner;
 
 import io.atomix.catalyst.transport.Address;
 
-public class AddressConfig {
+import java.io.Serializable;
+
+public class AddressConfig implements Serializable{
 
     private String IP;
 
