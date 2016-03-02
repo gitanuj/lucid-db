@@ -45,13 +45,13 @@ public class SpannerUtils {
         return index;
     }
 
-    public static List<Address> getClusterIPs(Object key) {
+    public static List<AddressConfig> getClusterIPs(Object key) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 
-    public static List<Address> getClusterIPs(int index) {
+    public static List<AddressConfig> getClusterIPs(int index) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
@@ -84,7 +84,7 @@ public class SpannerUtils {
 
     public static int getMyPaxosAddressIndex(String host, int port){
         int index = -1;
-        for(Address addr: Config.SERVER_IPS){
+        for(AddressConfig addr: Config.SERVER_IPS){
             index++;
             if(isThisMyIpAddress(addr.host()) && port==addr.port()){
                 break;
@@ -96,27 +96,27 @@ public class SpannerUtils {
         return index;
     }
 
-    public static List<Address> getPaxosCluster(int index){
-        List<Address> paxosMembers = new ArrayList<Address>();
+    public static List<AddressConfig> getPaxosCluster(int index){
+        List<AddressConfig> paxosMembers = new ArrayList<>();
         int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
         int position = index % clusterSize;
 
         for (int i=0; i<clusterSize; i++) {
             if(position!=index){
-                paxosMembers.add(new Address(Config.SERVER_IPS.get(position)));
+                paxosMembers.add(Config.SERVER_IPS.get(position));
             }
             position = (position+Config.NUM_CLUSTERS)%Config.SERVER_IPS.size();
         }
         return paxosMembers;
     }
 
-    public static List<Address> getPaxosClusterAll(int index){
-        List<Address> paxosMembers = new ArrayList<Address>();
+    public static List<AddressConfig> getPaxosClusterAll(int index){
+        List<AddressConfig> paxosMembers = new ArrayList<>();
         int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
         int position = index % clusterSize;
 
         for (int i=0; i<clusterSize; i++) {
-                paxosMembers.add(new Address(Config.SERVER_IPS.get(position)));
+                paxosMembers.add(Config.SERVER_IPS.get(position));
             position = (position+Config.NUM_CLUSTERS)%Config.SERVER_IPS.size();
         }
         return paxosMembers;
@@ -128,5 +128,13 @@ public class SpannerUtils {
         thread.setName(name);
         thread.start();
         return thread;
+    }
+
+    public static List<Address> toAddress(List<AddressConfig> addressConfigList) {
+        List<Address> addressList = new ArrayList<>();
+        for(AddressConfig addressConfig: addressConfigList) {
+            addressList.add(addressConfig.toAddress());
+        }
+        return addressList;
     }
 }

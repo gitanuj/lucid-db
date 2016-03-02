@@ -11,12 +11,12 @@ import java.util.Map;
 public class TransportObject implements Serializable{
     private long txn_id;
     private Map<String, String> writeMap;
-    private Address coordinator;
+    private AddressConfig coordinator;
     private int number_of_leaders;
 
     private boolean isCoordinator;
 
-    public TransportObject(Address coord, long id, Map<String, String> map, int num, boolean isC){
+    public TransportObject(AddressConfig coord, long id, Map<String, String> map, int num, boolean isC){
         this.txn_id = id;
         writeMap = map;
         this.coordinator = coord;
@@ -56,11 +56,11 @@ public class TransportObject implements Serializable{
         this.writeMap = writeMap;
     }
 
-    public Address getCoordinator() {
+    public AddressConfig getCoordinator() {
         return coordinator;
     }
 
-    public void setCoordinator(Address coordinator) {
+    public void setCoordinator(AddressConfig coordinator) {
         this.coordinator = coordinator;
     }
 

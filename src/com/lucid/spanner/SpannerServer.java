@@ -28,7 +28,7 @@ public class SpannerServer {
 
     volatile private CopycatServer.State role;
 
-    List<Address> paxosMembers;
+    List<AddressConfig> paxosMembers;
 
     private TwoPC twoPC;
     public ch.qos.logback.classic.Logger logger;
@@ -70,7 +70,7 @@ public class SpannerServer {
 
         paxosMembers = SpannerUtils.getPaxosClusterAll(index); // Excludes own ip
 
-        CopycatServer server = CopycatServer.builder(selfPaxosAddress, paxosMembers)
+        CopycatServer server = CopycatServer.builder(selfPaxosAddress, SpannerUtils.toAddress(paxosMembers))
                 .withTransport(new NettyTransport())
                 .withStateMachine(MapStateMachine::new)
                 .withStorage(Storage.builder().withStorageLevel(StorageLevel.MEMORY).build())
@@ -338,7 +338,7 @@ public class SpannerServer {
 
     private void paxosReplicate(Command command){
         // Create CopyCat client and replicate command
-        CopycatClient client = SpannerUtils.buildClient(paxosMembers);
+        CopycatClient client = SpannerUtils.buildClient(SpannerUtils.toAddress(paxosMembers));
 
         client.open().join();
 
@@ -352,16 +352,16 @@ public class SpannerServer {
         client.close().join();
     }
 
-    private void send2PCMsg(SpannerUtils.SERVER_MSG msgType, long tid, List<Address> recipients) {
+    private void send2PCMsg(SpannerUtils.SERVER_MSG msgType, long tid, List<AddressConfig> recipients) {
         // Send to all Leaders
         if (recipients == null) {
-            for (Address addr : paxosMembers) {
+            for (Address addr : SpannerUtils.toAddress(paxosMembers)) {
                 send2PCMsgSingle(msgType, tid, addr);
             }
 
         } else {
             // Send to given list
-            for (Address addr : paxosMembers) {
+            for (Address addr : SpannerUtils.toAddress(paxosMembers)) {
                 send2PCMsgSingle(msgType, tid, addr);
             }
         }

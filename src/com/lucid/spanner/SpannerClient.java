@@ -1,7 +1,6 @@
 package com.lucid.spanner;
 
 import com.lucid.common.LogUtils;
-import io.atomix.catalyst.transport.Address;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
@@ -20,7 +19,7 @@ public class SpannerClient {
     private static final String LOG_TAG = "SPANNER_CLIENT";
 
     public String executeQuery(Query query) throws InterruptedException, ExecutionException, TimeoutException {
-        CopycatClient client = SpannerUtils.buildClient(Config.SERVER_IPS);
+        CopycatClient client = SpannerUtils.buildClient(SpannerUtils.toAddress(Config.SERVER_IPS));
         client.open().join();
         String result = (String)client.submit(query).get(Config.READ_QUERY_TIMEOUT, TimeUnit.MILLISECONDS);
         client.close().join();
@@ -35,7 +34,7 @@ public class SpannerClient {
         HashMap<Integer, List<String>> sMap; // Maps cluster IDs to keys.
         Socket socket, coordinatorSocket = null;
         Scanner reader;
-        Address coordinatorAddress = null;
+        AddressConfig coordinatorAddress = null;
         ObjectOutputStream writer;
 
         if(command instanceof WriteCommand) {
@@ -64,9 +63,9 @@ public class SpannerClient {
             // Determine leaders.
             for (Map.Entry entry : sMap.entrySet()) {
                 int clusterId= (Integer)entry.getKey();
-                for (Address address : SpannerUtils.getClusterIPs(clusterId)) {
+                for (AddressConfig address : SpannerUtils.getClusterIPs(clusterId)) {
                     try {
-                        socket = new Socket(address.host(), ((AddressConfig)address).getClientPort());
+                        socket = new Socket(address.host(), address.getClientPort());
                         reader = new Scanner(new InputStreamReader(socket.getInputStream()));
                         if (reader.nextInt() == 1) {
 

@@ -11,7 +11,7 @@ public final class Config {
 
     public static final int NUM_CLUSTERS = 1;
 
-    public static final List<Address> SERVER_IPS = new ArrayList<>();
+    public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
 
     static {
         SERVER_IPS.add(new AddressConfig("192.168.0.11", 9000, 9100, 9200));
