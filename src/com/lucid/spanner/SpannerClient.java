@@ -7,9 +7,7 @@ import io.atomix.copycat.client.CopycatClient;
 
 import java.io.ObjectOutputStream;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 import java.net.Socket;
 import java.io.InputStreamReader;
@@ -26,18 +24,43 @@ public class SpannerClient {
         return result;
     }
 
-    public boolean executeCommand(Command command) throws UnexpectedCommand, LeaderNotFound, NoCoordinatorException {
-        HashMap<Integer, Socket> sessionMap; // Maps cluster IDs to leader in cluster.
-        Map<String, String> commands; // Key - Value map.
-        HashMap<Socket, Map<String, String>> commitObject; // Maps leaders to map of key-value
-        // pairs of objects to commit in that cluster.
-        HashMap<Integer, List<String>> sMap; // Maps cluster IDs to keys.
-        Socket socket, coordinatorSocket = null;
-        Scanner reader;
-        AddressConfig coordinatorAddress = null;
-        ObjectOutputStream writer;
+    public boolean executeCommand(Command command) throws UnexpectedCommand {
 
         if(command instanceof WriteCommand) {
+            try {
+                ExecuteThisCommand executeThisCommand = new ExecuteThisCommand(command);
+                Future future = Executors.newSingleThreadExecutor().submit(executeThisCommand);
+                return (Boolean) future.get(10, TimeUnit.SECONDS);
+            }
+            catch(InterruptedException | ExecutionException | TimeoutException e){
+                SpannerUtils.root.debug(LOG_TAG + " exception.");
+                e.printStackTrace();
+            }
+        }
+        else
+           throw new UnexpectedCommand(LOG_TAG + "Command not an instance of WriteCommand.");
+
+        return false;
+    }
+
+    class ExecuteThisCommand implements Callable {
+
+        private Command command;
+
+        ExecuteThisCommand(Command c){
+            this.command = c;
+        }
+
+        public Object call() throws LeaderNotFound, NoCoordinatorException {
+            HashMap<Integer, Socket> sessionMap; // Maps cluster IDs to leader in cluster.
+            Map<String, String> commands; // Key - Value map.
+            HashMap<Socket, Map<String, String>> commitObject; // Maps leaders to map of key-value
+            // pairs of objects to commit in that cluster.
+            HashMap<Integer, List<String>> sMap; // Maps cluster IDs to keys.
+            Socket socket, coordinatorSocket = null;
+            Scanner reader;
+            AddressConfig coordinatorAddress = null;
+            ObjectOutputStream writer;
 
             sessionMap = new HashMap<>();
             commands = ((WriteCommand) command).getWriteCommands();
@@ -72,10 +95,12 @@ public class SpannerClient {
                             // Choose coordinator.
                             if(coordinatorSocket == null) {
                                 coordinatorSocket = socket;
-                                SpannerUtils.root.debug("SpannerClient --> Coordinator for transaction " + ((WriteCommand) command).getTxn_id() + " is " + coordinatorSocket.getInetAddress().getHostAddress());
+                                SpannerUtils.root.debug(LOG_TAG + " Coordinator for transaction " + ((WriteCommand)
+                                        command)
+                                        .getTxn_id() + " is " + coordinatorSocket.getInetAddress().getHostAddress());
                                 coordinatorAddress = address;
                             }
-                            SpannerUtils.root.debug("SpannerClient --> Leader for Cluster ID " + clusterId + " is " +
+                            SpannerUtils.root.debug(LOG_TAG + " Leader for Cluster ID " + clusterId + " is " +
                                     address.host());
                             sessionMap.put(clusterId, socket);
 
@@ -89,7 +114,7 @@ public class SpannerClient {
                     }
                 }
                 if (sessionMap.get(clusterId) == null)
-                    throw new LeaderNotFound("Leader not found for cluster ID " + clusterId);
+                    throw new LeaderNotFound(LOG_TAG + " Leader not found for cluster ID " + clusterId);
             }
 
             if(coordinatorSocket == null || coordinatorAddress == null)
@@ -97,7 +122,7 @@ public class SpannerClient {
 
             // Prepare commit object
             for(Map.Entry<Integer, Socket> entry : sessionMap.entrySet())
-                prepareCommitObjectWithClusterID(entry.getKey(), entry.getValue(), commitObject, sMap, commands);
+                updateCommitObjectWithClusterID(entry.getKey(), entry.getValue(), commitObject, sMap, commands);
 
             // Send commit message to all leaders.
             try{
@@ -111,35 +136,34 @@ public class SpannerClient {
                 }
             }
             catch(Exception e){
-                LogUtils.error(LOG_TAG, "Something went wrong", e);
+                SpannerUtils.root.error(LOG_TAG);
+                e.printStackTrace();
             }
 
-            // Wait for response from coordinator, and pass it on to caller.
+            // Wait for response from coordinator and pass it on to caller.
             try{
                 reader = new Scanner(new InputStreamReader(coordinatorSocket.getInputStream()));
                 return reader.next().compareTo("COMMIT") == 0;
             }
             catch(Exception e){
-                SpannerUtils.root.error(e.getMessage());
+                SpannerUtils.root.error(LOG_TAG);
+                e.printStackTrace();
                 return false;
             }
-
         }
-        else
-           throw new UnexpectedCommand("Command not an instance of WriteCommand.");
-    }
 
-    private void prepareCommitObjectWithClusterID(int clusterID, Socket leader, HashMap<Socket, Map<String, String>>
-            commitObject, Map<Integer, List<String>> sMap, Map<String, String> commands){
+        private void updateCommitObjectWithClusterID(int clusterID, Socket leader, HashMap<Socket, Map<String, String>>
+                commitObject, Map<Integer, List<String>> sMap, Map<String, String> commands){
 
-        Map<String, String> map = new HashMap<>();
+            Map<String, String> map = new HashMap<>();
 
-        // Create map of key-value pairs for this cluster.
-        List<String> keys = sMap.get(clusterID);
-        for(String key : keys)
-            map.put(key, commands.get(key));
+            // Create map of key-value pairs for this cluster.
+            List<String> keys = sMap.get(clusterID);
+            for(String key : keys)
+                map.put(key, commands.get(key));
 
-        // Add entry in commit object for the leader of this cluster.
-        commitObject.put(leader, map);
+            // Add entry in commit object for the leader of this cluster.
+            commitObject.put(leader, map);
+        }
     }
 }
