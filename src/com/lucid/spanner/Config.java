@@ -10,8 +10,8 @@ public final class Config {
     private Config() {
     }
 
+    public static final int NUM_CLIENTS = 100;
     public static final int NUM_CLUSTERS = 1;
-
     public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
 
     static {

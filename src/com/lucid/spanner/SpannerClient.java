@@ -15,6 +15,7 @@ import java.io.InputStreamReader;
 public class SpannerClient {
 
     private static final String LOG_TAG = "SPANNER_CLIENT";
+    private static ExecutorService submissionService = Executors.newFixedThreadPool(Config.NUM_CLIENTS);
 
     public String executeQuery(Query query) throws InterruptedException, ExecutionException, TimeoutException {
         CopycatClient client = SpannerUtils.buildClient(SpannerUtils.toAddress(Config.SERVER_IPS));
@@ -29,7 +30,9 @@ public class SpannerClient {
         if(command instanceof WriteCommand) {
             try {
                 ExecuteThisCommand executeThisCommand = new ExecuteThisCommand(command);
-                Future future = Executors.newSingleThreadExecutor().submit(executeThisCommand);
+                Future future = submissionService.submit(executeThisCommand);
+                LogUtils.debug(LOG_TAG, "Submitted transaction " + ((WriteCommand) command).getTxn_id() + " to " +
+                        "cluster.");
                 return (Boolean) future.get(10, TimeUnit.SECONDS);
             }
             catch(InterruptedException | ExecutionException | TimeoutException e){
