@@ -33,8 +33,7 @@ public class SpannerClient {
                 return (Boolean) future.get(10, TimeUnit.SECONDS);
             }
             catch(InterruptedException | ExecutionException | TimeoutException e){
-                SpannerUtils.root.debug(LOG_TAG + " exception.");
-                e.printStackTrace();
+                LogUtils.error(LOG_TAG, "Something went wrong.", e);
             }
         }
         else
@@ -136,8 +135,7 @@ public class SpannerClient {
                 }
             }
             catch(Exception e){
-                SpannerUtils.root.error(LOG_TAG);
-                e.printStackTrace();
+                LogUtils.error(LOG_TAG, "Failed to send commit message(s) to leader(s).", e);
             }
 
             // Wait for response from coordinator and pass it on to caller.
@@ -146,8 +144,7 @@ public class SpannerClient {
                 return reader.next().compareTo("COMMIT") == 0;
             }
             catch(Exception e){
-                SpannerUtils.root.error(LOG_TAG);
-                e.printStackTrace();
+                LogUtils.error(LOG_TAG, "Could not get coordinator response.", e);
                 return false;
             }
         }
