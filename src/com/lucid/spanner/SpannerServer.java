@@ -14,10 +14,8 @@ import io.atomix.copycat.server.storage.Storage;
 import io.atomix.copycat.server.storage.StorageLevel;
 
 import java.io.*;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
@@ -98,8 +96,8 @@ public class SpannerServer {
                                 cohort.getInetAddress() + cohort.getPort());
                         handleServerAccept(cohort);
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
+                } catch (Exception e) {
+                    LogUtils.error(LOG_TAG, "Exception in acceptServer thread.", e);
                 }
             }
         };
@@ -120,8 +118,8 @@ public class SpannerServer {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(cohort.getInputStream()));
             inputLine = in.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            LogUtils.error(LOG_TAG, "Error while communicating with cohort", e);
         }
 
         SpannerUtils.SERVER_MSG msgType;
@@ -139,8 +137,8 @@ public class SpannerServer {
             LogUtils.error(LOG_TAG, "Unknown msg recd from cohort:" + inputLine);
             try {
                 cohort.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (Exception e) {
+                LogUtils.error(LOG_TAG, "Exception while closing connection.", e);
             }
             return;
         }
@@ -207,8 +205,8 @@ public class SpannerServer {
                         Socket client = serverSocket.accept();
                         handleClientAccept(client);
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
+                } catch (Exception e) {
+                    LogUtils.error(LOG_TAG, "Exception in accept Client thread.", e);
                 }
             }
         };
@@ -359,7 +357,7 @@ public class SpannerServer {
 
         try {
             client.submit(command).get(Config.COMMAND_TIMEOUT, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception while replicating Command:" + command, e);
         }
 
@@ -388,7 +386,7 @@ public class SpannerServer {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             out.println(msg);
             socket.close();
-        } catch (IOException e) {
+        } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exeption during sending 2PC msg:", e);
         }
     }
@@ -491,7 +489,7 @@ class TwoPC {
             tState.prepareCount.acquire(nshards);
             if (tState.commit != TState.CSTATE.ABORT)    // Haven't recd NACK
                 tState.commit = TState.CSTATE.COMMIT;
-        } catch (InterruptedException e) {
+        } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Interrupted while waiting for prepared. tid:" + tid, e);
         }
     }

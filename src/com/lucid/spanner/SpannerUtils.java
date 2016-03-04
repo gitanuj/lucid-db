@@ -18,18 +18,8 @@ import java.util.List;
 
 public class SpannerUtils {
 
-    public enum SERVER_MSG{
+    public enum SERVER_MSG {
         PREPARE_ACK, PREPARE_NACK, COMMIT, ABORT
-    }
-
-    public static ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
-
-    public static void enableLogging() {
-        setLoggingLevel(ch.qos.logback.classic.Level.DEBUG);
-    }
-
-    public static void setLoggingLevel(ch.qos.logback.classic.Level level) {
-        root.setLevel(level);
     }
 
     public static CopycatClient buildClient(List<Address> members) {
@@ -40,7 +30,7 @@ public class SpannerUtils {
         return client;
     }
 
-    public static int getClusterID(Object key){
+    public static int getClusterID(Object key) {
         int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
         return index;
     }
@@ -57,17 +47,17 @@ public class SpannerUtils {
     }
 
     // Just checks is my ip is equal to given host, no port matching
-    public static boolean isThisMyIpAddress(String host)  {
-        if(host=="localhost")
+    public static boolean isThisMyIpAddress(String host) {
+        if (host == "localhost")
             return true;
 
-        if (host==getMyInternetIP()){
+        if (host == getMyInternetIP()) {
             return true;
         }
         return false;
     }
 
-    public static String getMyInternetIP(){
+    public static String getMyInternetIP() {
         BufferedReader in = null;
         String ip = "";
         try {
@@ -82,48 +72,47 @@ public class SpannerUtils {
         return ip;
     }
 
-    public static int getMyPaxosAddressIndex(String host, int port){
+    public static int getMyPaxosAddressIndex(String host, int port) {
         int index = -1;
-        for(AddressConfig addr: Config.SERVER_IPS){
+        for (AddressConfig addr : Config.SERVER_IPS) {
             index++;
-            if(isThisMyIpAddress(addr.host()) && port==addr.port()){
+            if (isThisMyIpAddress(addr.host()) && port == addr.port()) {
                 break;
             }
         }
-        if(index>=Config.SERVER_IPS.size()){
+        if (index >= Config.SERVER_IPS.size()) {
             return -1;
         }
         return index;
     }
 
-    public static List<AddressConfig> getPaxosCluster(int index){
+    public static List<AddressConfig> getPaxosCluster(int index) {
         List<AddressConfig> paxosMembers = new ArrayList<>();
-        int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
+        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
         int position = index % clusterSize;
 
-        for (int i=0; i<clusterSize; i++) {
-            if(position!=index){
+        for (int i = 0; i < clusterSize; i++) {
+            if (position != index) {
                 paxosMembers.add(Config.SERVER_IPS.get(position));
             }
-            position = (position+Config.NUM_CLUSTERS)%Config.SERVER_IPS.size();
+            position = (position + Config.NUM_CLUSTERS) % Config.SERVER_IPS.size();
         }
         return paxosMembers;
     }
 
-    public static List<AddressConfig> getPaxosClusterAll(int index){
+    public static List<AddressConfig> getPaxosClusterAll(int index) {
         List<AddressConfig> paxosMembers = new ArrayList<>();
-        int clusterSize = Config.SERVER_IPS.size()/Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
+        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
         int position = index % clusterSize;
 
-        for (int i=0; i<clusterSize; i++) {
-                paxosMembers.add(Config.SERVER_IPS.get(position));
-            position = (position+Config.NUM_CLUSTERS)%Config.SERVER_IPS.size();
+        for (int i = 0; i < clusterSize; i++) {
+            paxosMembers.add(Config.SERVER_IPS.get(position));
+            position = (position + Config.NUM_CLUSTERS) % Config.SERVER_IPS.size();
         }
         return paxosMembers;
     }
 
-    public static Thread startThreadWithName(Runnable runnable, String name)
-    {
+    public static Thread startThreadWithName(Runnable runnable, String name) {
         Thread thread = new Thread(runnable);
         thread.setName(name);
         thread.start();
@@ -132,7 +121,7 @@ public class SpannerUtils {
 
     public static List<Address> toAddress(List<AddressConfig> addressConfigList) {
         List<Address> addressList = new ArrayList<>();
-        for(AddressConfig addressConfig: addressConfigList) {
+        for (AddressConfig addressConfig : addressConfigList) {
             addressList.add(addressConfig.toAddress());
         }
         return addressList;

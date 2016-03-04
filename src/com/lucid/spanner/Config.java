@@ -15,7 +15,7 @@ public final class Config {
     public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
 
     static {
-        String host = "169.231.64.24";
+        String host = "192.168.0.11";
 //        try {
 //            host = InetAddress.getLocalHost().getHostName();
 //        } catch (Exception e) {}

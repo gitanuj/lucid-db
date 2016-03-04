@@ -97,12 +97,12 @@ public class SpannerClient {
                             // Choose coordinator.
                             if(coordinatorSocket == null) {
                                 coordinatorSocket = socket;
-                                SpannerUtils.root.debug(LOG_TAG + " Coordinator for transaction " + ((WriteCommand)
+                                LogUtils.debug(LOG_TAG, " Coordinator for transaction " + ((WriteCommand)
                                         command)
                                         .getTxn_id() + " is " + coordinatorSocket.getInetAddress().getHostAddress());
                                 coordinatorAddress = address;
                             }
-                            SpannerUtils.root.debug(LOG_TAG + " Leader for Cluster ID " + clusterId + " is " +
+                            LogUtils.debug(LOG_TAG, " Leader for Cluster ID " + clusterId + " is " +
                                     address.host());
                             sessionMap.put(clusterId, socket);
 
