@@ -2,22 +2,27 @@ package com.lucid.spanner;
 
 import com.google.common.util.concurrent.Striped;
 import com.lucid.common.LogUtils;
-import com.lucid.test.MapStateMachine;
-import com.lucid.test.Utils;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
-import io.atomix.copycat.server.storage.Log;
 import io.atomix.copycat.server.storage.Storage;
 import io.atomix.copycat.server.storage.StorageLevel;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 
@@ -287,9 +292,8 @@ public class SpannerServer {
 
                 } catch (Exception e) {
                     LogUtils.error(LOG_TAG, "Error during 2PC handling.", e);
-                }
-                finally{
-                    if(client!=null){
+                } finally {
+                    if (client != null) {
                         try {
                             client.close();
                         } catch (Exception e) {
@@ -401,7 +405,7 @@ public class SpannerServer {
     }
 
     private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Socket socket) {
-        if(socket==null){
+        if (socket == null) {
             LogUtils.error(LOG_TAG, "Socket object is NULL.");
             throw new NullPointerException();
         }
@@ -412,18 +416,6 @@ public class SpannerServer {
             //socket.close();
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
-        }
-    }
-
-    private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Socket client) {
-        String msg = msgType.toString() + ":" + tid;
-        try {
-            PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-            out.println(msg);
-            LogUtils.debug(LOG_TAG, "Sent 2PC Message to " + client.getInetAddress().getHostName());
-            client.close();
-        } catch (Exception e) {
-            LogUtils.error(LOG_TAG, "Exeption during sending 2PC msg:", e);
         }
     }
 
