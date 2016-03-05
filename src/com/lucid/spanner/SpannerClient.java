@@ -144,7 +144,9 @@ public class SpannerClient {
             // Wait for response from coordinator and pass it on to caller.
             try{
                 reader = new Scanner(new InputStreamReader(coordinatorSocket.getInputStream()));
-                return reader.next().compareTo("COMMIT") == 0;
+                String result = reader.next();
+                LogUtils.debug(LOG_TAG,"Message received from coordinator: " + result);
+                return result.startsWith("COMMIT");
             }
             catch(Exception e){
                 LogUtils.error(LOG_TAG, "Could not get coordinator response.", e);

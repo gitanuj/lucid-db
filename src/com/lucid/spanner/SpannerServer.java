@@ -387,12 +387,13 @@ public class SpannerServer {
         }
     }
 
-    private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Address addr) {
+    private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Address client) {
         String msg = msgType.toString() + ":" + tid;
         try {
-            Socket socket = new Socket(addr.host(), addr.port());
+            Socket socket = new Socket(client.host(), client.port());
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             out.println(msg);
+            LogUtils.debug(LOG_TAG, "Sent 2PC Message to " + client.host());
             socket.close();
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
@@ -411,6 +412,18 @@ public class SpannerServer {
             //socket.close();
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
+        }
+    }
+
+    private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Socket client) {
+        String msg = msgType.toString() + ":" + tid;
+        try {
+            PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+            out.println(msg);
+            LogUtils.debug(LOG_TAG, "Sent 2PC Message to " + client.getInetAddress().getHostName());
+            client.close();
+        } catch (Exception e) {
+            LogUtils.error(LOG_TAG, "Exeption during sending 2PC msg:", e);
         }
     }
 
