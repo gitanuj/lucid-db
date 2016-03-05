@@ -18,9 +18,10 @@ public class SpannerDB extends DB {
         try {
             String qualifiedKey = YCSBUtils.createQualifiedKey(table, key);
             Query<String> query = new ReadQuery(qualifiedKey);
-            SpannerClient spannerClient = new SpannerClient();
-            String value = spannerClient.executeQuery(query);
-            YCSBUtils.fromJson(value, fields, result);
+            String value = SpannerClient.getInstance().executeQuery(query);
+            if (value != null) {
+                YCSBUtils.fromJson(value, fields, result);
+            }
             return Status.OK;
         } catch (Exception e) {
             e.printStackTrace();

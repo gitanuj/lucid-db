@@ -1,6 +1,7 @@
 package com.lucid.ycsb;
 
 import com.yahoo.ycsb.ByteIterator;
+import com.yahoo.ycsb.CommandLine;
 import com.yahoo.ycsb.RandomByteIterator;
 import com.yahoo.ycsb.Status;
 
@@ -18,10 +19,13 @@ public class SpannerDBTester {
     }
 
     private static void testSpannerDb() {
+
+        CommandLine commandLine = new CommandLine();
+
         SpannerDB spannerDB = new SpannerDB();
 
         // TODO Fails test for 1000 threads. Investigate!
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 80; i++) {
             final int id = i;
             Thread t = new Thread(() -> {
                 String table = "table";
@@ -30,7 +34,7 @@ public class SpannerDBTester {
 
                 Status status = spannerDB.insert(table, key, values);
                 System.out.println(id + " write: " + status);
-            });
+            }, "spanner-db-tester-" + id);
             THREADS.add(t);
         }
 

@@ -28,7 +28,14 @@ public class Batcher {
 
     private final ScheduledExecutorService timeoutExecutor = Executors.newScheduledThreadPool(1);
 
-    private final ExecutorService executorService = Executors.newFixedThreadPool(MAX_REQUEST_THREADS);
+    private final ExecutorService executorService = Executors.newFixedThreadPool(MAX_REQUEST_THREADS, new ThreadFactory() {
+        private int id;
+
+        @Override
+        public Thread newThread(Runnable r) {
+            return new Thread(r::run, "batcher-" + id++);
+        }
+    });
 
     private final List<WriteObject> batch = new ArrayList<>();
 
@@ -163,8 +170,7 @@ public class Batcher {
             boolean result = false;
             try {
                 WriteCommand writeCommand = new WriteCommand(txnId, YCSBUtils.toCommandsMap(batch));
-                SpannerClient spannerClient = new SpannerClient();
-                result = spannerClient.executeCommand(writeCommand);
+                result = SpannerClient.getInstance().executeCommand(writeCommand);
             } catch (Exception e) {
                 e.printStackTrace();
             }

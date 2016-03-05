@@ -35,6 +35,8 @@ public class SpannerServer {
     private int serverPort;
     private int paxosPort;
 
+    private CopycatClient copycatClient;
+
     volatile private CopycatServer.State role;
 
     List<AddressConfig> paxosMembers;
@@ -47,6 +49,7 @@ public class SpannerServer {
         this.serverPort = addressConfig.getServerPort();
         this.clientPort = addressConfig.getClientPort();
         this.paxosPort = addressConfig.port();
+
         twoPC = new TwoPC();
         paxosMembers = new ArrayList<>();
         LogUtils.debug(LOG_TAG, "Initialing SpannerServer with host:" + host +
@@ -54,6 +57,9 @@ public class SpannerServer {
 
         // Start Paxos cluster
         startPaxosCluster();
+
+        this.copycatClient = SpannerUtils.buildClient(SpannerUtils.toAddress(paxosMembers));
+        this.copycatClient.open().join();
 
         // Start server accept thread
         acceptServers();
@@ -367,10 +373,7 @@ public class SpannerServer {
 
         try {
             LogUtils.debug(LOG_TAG, "Paxos Replication. Creating Client.");
-            CopycatClient client = SpannerUtils.buildClient(SpannerUtils.toAddress(paxosMembers));
-            client.open().join();
-            client.submit(command).get(Config.COMMAND_TIMEOUT, TimeUnit.MILLISECONDS);
-            client.close().join();
+            copycatClient.submit(command).get(Config.COMMAND_TIMEOUT, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception while replicating Command:" + command, e);
         }

@@ -1,5 +1,6 @@
 package com.lucid.common;
 
+import ch.qos.logback.classic.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,6 +11,15 @@ public class LogUtils {
     private static final String LOG_PREFIX = "[lucid-db] ";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+
+    static {
+        setLoggingLevel(Level.DEBUG);
+    }
+
+    private static void setLoggingLevel(ch.qos.logback.classic.Level level) {
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+        root.setLevel(level);
+    }
 
     public static void debug(String tag, String message, Throwable throwable) {
         LOGGER.debug(getLogMessage(tag, message), throwable);
