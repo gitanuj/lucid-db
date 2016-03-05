@@ -267,14 +267,14 @@ public class SpannerServer {
                     if (transportObject.isCoordinator()) {
                         LogUtils.debug(LOG_TAG, "At Coordinator. Finished Replicating. Waiting for Prepare(N)ACKs.");
                         // Determine number of shards involved
-                        nShards = transportObject.getNumber_of_leaders();
+                        nShards = transportObject.getNumber_of_leaders() - 1;
                         twoPC.addNewTxn(tid, nShards);
                         twoPC.waitForPrepareAcks(tid);
                         Address clientAddr = new Address(client.getInetAddress().getHostName(), client.getPort());
                         if (twoPC.canCommit(tid)) {
-                            handleAllPrepareAcks(tid, clientAddr);
+                            handleAllPrepareAcks(tid, client);
                         } else {
-                            handlePrepareNack(tid, clientAddr);
+                            handlePrepareNack(tid, client);
                         }
                     } else {
                         LogUtils.debug(LOG_TAG, "At Leader: Sending prepare ACK/NACK to co-ordinator.");
@@ -288,15 +288,24 @@ public class SpannerServer {
                 } catch (Exception e) {
                     LogUtils.error(LOG_TAG, "Error during 2PC handling.", e);
                 }
+                finally{
+                    if(client!=null){
+                        try {
+                            client.close();
+                        } catch (Exception e) {
+                            LogUtils.error(LOG_TAG, "Exception while closing client.", e);
+                        }
+                    }
+                }
             }
         };
-        SpannerUtils.startThreadWithName(clientRunnable, "Client Handling thread for client:");
+        SpannerUtils.startThreadWithName(clientRunnable, "Client Handling thread for client:" + client.getInetAddress());
     }
 
     /* After receiving PREPARE_ACKs from everyone, txn is ready for commit.
 
      */
-    private void handleAllPrepareAcks(long tid, Address clientAddr) {
+    private void handleAllPrepareAcks(long tid, Socket client) {
         LogUtils.debug(LOG_TAG, "Coord recd all ACKs");
         // (Commit locally) Do Paxos in own cluster for CommitMsg
         CommitCommand cmd = new CommitCommand(tid);
@@ -308,7 +317,7 @@ public class SpannerServer {
 
         LogUtils.debug(LOG_TAG, "Sending 2PC COMMIT message to client and other leaders.");
         // send COMMIT to client
-        send2PCMsgSingle(SpannerUtils.SERVER_MSG.COMMIT, tid, clientAddr);
+        send2PCMsgSingle(SpannerUtils.SERVER_MSG.COMMIT, tid, client);
 
         // Send 2PC commit to other leaders.
         send2PCMsg(SpannerUtils.SERVER_MSG.COMMIT, tid, null);
@@ -319,7 +328,7 @@ public class SpannerServer {
     }
 
 
-    private void handlePrepareNack(long tid, Address clientAddr) {
+    private void handlePrepareNack(long tid, Socket client) {
         LogUtils.debug(LOG_TAG, "Coord recd a NACK. Sending ABORT.");
         // (Abort locally) Do Paxos in own cluster for AbortMsg
         AbortCommand cmd = new AbortCommand(tid);
@@ -332,7 +341,7 @@ public class SpannerServer {
 
         LogUtils.debug(LOG_TAG, "Sending 2PC ABORTs to client and other leaders.");
         // send COMMIT to client
-        send2PCMsgSingle(SpannerUtils.SERVER_MSG.ABORT, tid, clientAddr);
+        send2PCMsgSingle(SpannerUtils.SERVER_MSG.ABORT, tid, client);
 
         // Send 2PC abort to other leaders.
         send2PCMsg(SpannerUtils.SERVER_MSG.ABORT, tid, null);
@@ -351,17 +360,16 @@ public class SpannerServer {
 
     private void paxosReplicate(Command command) {
         // Create CopyCat client and replicate command
-        CopycatClient client = SpannerUtils.buildClient(SpannerUtils.toAddress(paxosMembers));
-
-        client.open().join();
 
         try {
+            LogUtils.debug(LOG_TAG, "Paxos Replication. Creating Client.");
+            CopycatClient client = SpannerUtils.buildClient(SpannerUtils.toAddress(paxosMembers));
+            client.open().join();
             client.submit(command).get(Config.COMMAND_TIMEOUT, TimeUnit.MILLISECONDS);
+            client.close().join();
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception while replicating Command:" + command, e);
         }
-
-        client.close().join();
     }
 
     private void send2PCMsg(SpannerUtils.SERVER_MSG msgType, long tid, List<AddressConfig> recipients) {
@@ -387,7 +395,22 @@ public class SpannerServer {
             out.println(msg);
             socket.close();
         } catch (Exception e) {
-            LogUtils.error(LOG_TAG, "Exeption during sending 2PC msg:", e);
+            LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
+        }
+    }
+
+    private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Socket socket) {
+        if(socket==null){
+            LogUtils.error(LOG_TAG, "Socket object is NULL.");
+            throw new NullPointerException();
+        }
+        String msg = msgType.toString() + ":" + tid;
+        try {
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            out.println(msg);
+            //socket.close();
+        } catch (Exception e) {
+            LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
         }
     }
 
