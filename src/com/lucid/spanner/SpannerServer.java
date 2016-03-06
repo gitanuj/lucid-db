@@ -16,10 +16,7 @@ import java.io.ObjectInputStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +32,8 @@ public class SpannerServer {
     private int serverPort;
     private int paxosPort;
 
+    private Map<Long, Lock[]> lockMap;
+
     private CopycatClient copycatClient;
 
     volatile private CopycatServer.State role;
@@ -49,6 +48,7 @@ public class SpannerServer {
         this.serverPort = addressConfig.getServerPort();
         this.clientPort = addressConfig.getClientPort();
         this.paxosPort = addressConfig.port();
+        this.lockMap = new HashMap<>();
 
         twoPC = new TwoPC();
         paxosMembers = new ArrayList<>();
@@ -433,13 +433,11 @@ public class SpannerServer {
                 locks[counter].lock();
                 counter++;
             }
-
+            lockMap.put(tid, locks);
         }
-        // TODO: Decide how to handle lock unlocks
-        finally {
-            //LogUtils.debug(LOG_TAG, "Releasing locks for keys:"+keys);
-            for (Lock lock : locks)
-                lock.unlock();
+        // TODO: need to handle locks in a better way
+        catch (Exception e) {
+            LogUtils.error(LOG_TAG, "Exception while locking for txn tid:"+tid, e);
         }
     }
 
@@ -450,6 +448,16 @@ public class SpannerServer {
         }
         LogUtils.debug(LOG_TAG, "Releasing locks for txn:" + tid);
         // TODO: release locks
+        Lock[] locks = lockMap.get(tid);
+        try {
+            for (Lock lock : locks) {
+                lock.unlock();
+            }
+            lockMap.remove(tid);
+        }
+        catch (Exception e){
+            LogUtils.error(LOG_TAG, "Exception while Unlocking for txn tid:"+tid, e);
+        }
     }
 
     public static void main(String[] args) {
