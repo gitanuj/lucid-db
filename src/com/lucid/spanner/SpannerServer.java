@@ -229,10 +229,10 @@ public class SpannerServer {
         Runnable clientRunnable = new Runnable() {
             @Override
             public void run() {
+                long tid = 0;
+                int nShards = 0;
                 try {
                     LogUtils.debug(LOG_TAG, "Client connected:" + client.getInetAddress() + ":" + client.getPort());
-                    long tid = 0;
-                    int nShards = 0;
                     // Send my role to the client
                     PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                     out.println(iAmLeader() ? "1" : "0");
@@ -299,6 +299,7 @@ public class SpannerServer {
                 } catch (Exception e) {
                     LogUtils.error(LOG_TAG, "Error during 2PC handling.", e);
                 } finally {
+                    tryReleaseLocks(tid);
                     if (client != null) {
                         try {
                             client.close();
@@ -334,7 +335,6 @@ public class SpannerServer {
 
         // Remove transaction from list of active txns
         twoPC.removeTxn(tid);
-
     }
 
 
@@ -428,17 +428,25 @@ public class SpannerServer {
         Lock[] locks = new Lock[numberOfLocks];
         LogUtils.debug(LOG_TAG, "Getting locks for txn:" + tid + " keys:" + keys);
         try {
+            LogUtils.debug(LOG_TAG, "Txn " + tid + " is waiting for locks.");
             for (String key : keys) {
                 locks[counter] = Locker.getLock(key);
                 locks[counter].lock();
                 counter++;
             }
+            LogUtils.debug(LOG_TAG, "Txn " + tid + " got all locks.");
             lockMap.put(tid, locks);
         }
-        // TODO: need to handle locks in a better way
+        // TODO: need to handle locks in a better way. for ex. if txn fails, locks should be released
         catch (Exception e) {
-            LogUtils.error(LOG_TAG, "Exception while locking for txn tid:"+tid, e);
+            LogUtils.error(LOG_TAG, "Exception while locking for txn tid:" + tid, e);
+            releaseLocks(tid);
         }
+    }
+
+    private void tryReleaseLocks(long tid) {
+        if(lockMap.containsKey(tid))
+            releaseLocks(tid);
     }
 
     private void releaseLocks(long tid) {
@@ -446,18 +454,24 @@ public class SpannerServer {
             LogUtils.error(LOG_TAG, "I am not a leader, but I am in releaseLocks :/");
             return;
         }
-        LogUtils.debug(LOG_TAG, "Releasing locks for txn:" + tid);
+        LogUtils.debug(LOG_TAG, "Txn " + tid + " is releasing all locks.");
         // TODO: release locks
-        Lock[] locks = lockMap.get(tid);
-        try {
+        if (lockMap.containsKey(tid)) {
+            Lock[] locks = lockMap.get(tid);
             for (Lock lock : locks) {
-                lock.unlock();
+                try {
+                    lock.unlock();
+                } catch (Exception e) {
+                    LogUtils.error(LOG_TAG, "Exception while Unlocking for txn tid:" + tid, e);
+                }
+                lockMap.remove(tid);
             }
-            lockMap.remove(tid);
+        } else {
+            LogUtils.error(LOG_TAG, "No Entry found in lockMap for txn: " + tid);
+            return;
         }
-        catch (Exception e){
-            LogUtils.error(LOG_TAG, "Exception while Unlocking for txn tid:"+tid, e);
-        }
+        LogUtils.debug(LOG_TAG, "Txn " + tid + " released all locks.");
+        return;
     }
 
     public static void main(String[] args) {
