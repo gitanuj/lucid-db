@@ -8,6 +8,7 @@ import com.lucid.ycsb.YCSBClient;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.List;
 
@@ -26,13 +27,22 @@ public class RCClient implements YCSBClient {
         // Execute query on all servers, and wait for a response from majority.
         for(AddressConfig shard : queryShards){
             try{
-                clientRequests[counter] = new Thread(new QueryCluster(shard, query)).start();
+                clientRequests[counter] = new Thread(new QueryCluster(shard, (ReadQuery)query));
+                clientRequests[counter].start();
+                counter++;
             }
             catch(Exception e){
                 LogUtils.debug(LOG_TAG, "Transaction ID: " + ((ReadQuery)query).key() + ". Something went wrong while" +
                         " starting thread number " + (counter - 1),e);
             }
         }
+
+        LogUtils.debug(LOG_TAG, "Number of requests made: " + counter);
+
+        // Sleep till notified when a majority of requests have come back.
+        waitOnMe.wait();
+
+
     }
 
     @Override
@@ -44,6 +54,8 @@ public class RCClient implements YCSBClient {
 
         AddressConfig server;
         ReadQuery query;
+        ObjectOutputStream writer;
+
         public QueryCluster(AddressConfig server, ReadQuery query) {
             this.server = server;
             this.query = query;
@@ -51,9 +63,14 @@ public class RCClient implements YCSBClient {
 
         @Override
         public void run() {
-
-            // Open a connection to the server.
-            Socket socket = new Socket(server.host(), server.getClientPort());
+            try {
+                Socket socket = new Socket(server.host(), server.getClientPort());
+                writer = new ObjectOutputStream(socket.getOutputStream());
+                writer.write(new TransportObject())
+            }
+            catch(Exception e){
+                LogUtils.debug(LOG_TAG, "Could not connect to server.", e);
+            }
         }
     }
 
