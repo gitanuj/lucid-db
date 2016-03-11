@@ -1,7 +1,7 @@
 package com.lucid.ycsb;
 
-import com.lucid.spanner.AddressConfig;
-import com.lucid.spanner.Config;
+import com.lucid.common.AddressConfig;
+import com.lucid.common.Config;
 import com.lucid.spanner.SpannerServer;
 import com.lucid.spanner.SpannerUtils;
 

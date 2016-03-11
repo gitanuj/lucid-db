@@ -1,4 +1,4 @@
-package com.lucid.spanner;
+package com.lucid.common;
 
 /**
  * Created by aviral on 2/27/16.

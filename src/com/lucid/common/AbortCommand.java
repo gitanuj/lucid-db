@@ -1,12 +1,12 @@
-package com.lucid.spanner;
+package com.lucid.common;
 
 import io.atomix.copycat.Command;
 
-public class CommitCommand implements Command<Object> {
+public class AbortCommand implements Command<Object> {
 
     private Object data;
 
-    public CommitCommand(Object data) {
+    public AbortCommand(Object data) {
         this.data = data;
     }
 

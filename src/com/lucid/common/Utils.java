@@ -1,8 +1,5 @@
 package com.lucid.common;
 
-import com.lucid.spanner.AddressConfig;
-import com.lucid.spanner.Config;
-
 import java.io.Closeable;
 import java.util.List;
 

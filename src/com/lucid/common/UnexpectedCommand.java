@@ -1,4 +1,4 @@
-package com.lucid.spanner;
+package com.lucid.common;
 
 /**
  * @author Aviral

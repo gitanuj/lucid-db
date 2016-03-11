@@ -1,6 +1,6 @@
 package com.lucid.spanner;
 
-import io.atomix.catalyst.transport.Address;
+import com.lucid.common.AddressConfig;
 
 import java.io.Serializable;
 import java.util.Map;
