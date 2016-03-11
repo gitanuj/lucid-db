@@ -134,7 +134,13 @@ public class SpannerClient implements YCSBClient {
         try {
             reader = new Scanner(new InputStreamReader(coordinatorSocket.getInputStream()));
             String result = reader.next();
-            LogUtils.debug(LOG_TAG, "Message received from coordinator: " + result);
+            LogUtils.debug(LOG_TAG, "Message received from coordinator: " + result + ". Commit cluster IDs at which " +
+                    "commit was applied:");
+            for(Map.Entry<Integer, List<String>> map : sMap.entrySet())
+                LogUtils.debug(LOG_TAG, System.out.println(map.getKey());
+
+            System.out.println();
+
             return result.startsWith("COMMIT");
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Could not get coordinator response.", e);

@@ -45,7 +45,7 @@ public class SpannerUtils {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
-
+    
     // Just checks is my ip is equal to given host, no port matching
     public static boolean isThisMyIpAddress(String host) {
         if (host.equals("localhost"))
