@@ -1,6 +1,8 @@
 package com.lucid.spanner;
 
 import com.lucid.common.LogUtils;
+import com.lucid.common.ReadQuery;
+import com.lucid.common.WriteCommand;
 import io.atomix.copycat.server.Commit;
 import io.atomix.copycat.server.Snapshottable;
 import io.atomix.copycat.server.StateMachine;

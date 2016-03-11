@@ -1,7 +1,7 @@
 package com.lucid.ycsb;
 
 import com.lucid.common.LogUtils;
-import com.lucid.spanner.ReadQuery;
+import com.lucid.common.ReadQuery;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.DB;
 import com.yahoo.ycsb.Status;

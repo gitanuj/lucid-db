@@ -1,6 +1,10 @@
 package com.lucid.common;
 
+import com.lucid.spanner.AddressConfig;
+import com.lucid.spanner.Config;
+
 import java.io.Closeable;
+import java.util.List;
 
 public class Utils {
 
@@ -14,5 +18,11 @@ public class Utils {
                 LogUtils.error(LOG_TAG, "Something went wrong while closing stream", e);
             }
         }
+    }
+
+    public static List<AddressConfig> getReplicaClusterIPs(Object key) {
+        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
+        int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
+        return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 }

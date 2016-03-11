@@ -1,7 +1,7 @@
 package com.lucid.ycsb;
 
 import com.lucid.common.LogUtils;
-import com.lucid.spanner.WriteCommand;
+import com.lucid.common.WriteCommand;
 
 import java.util.ArrayList;
 import java.util.HashMap;

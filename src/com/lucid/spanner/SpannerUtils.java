@@ -35,12 +35,6 @@ public class SpannerUtils {
         return index;
     }
 
-    public static List<AddressConfig> getReplicaClusterIPs(Object key) {
-        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
-        return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
-    }
-
     public static List<AddressConfig> getReplicaClusterIPs(int index) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
