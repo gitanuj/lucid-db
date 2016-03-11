@@ -66,7 +66,7 @@ public class SpannerClient {
 
         // Accumulate keys mapped to the same clusters.
         for (Map.Entry entry : commands.entrySet()) {
-            int clusterId = SpannerUtils.getClusterID(entry.getKey());
+            int clusterId = SpannerUtils.getReplicaClusterID(entry.getKey());
             List<String> list = sMap.get(clusterId);
             if (list == null) {
                 list = new ArrayList<>();
@@ -82,7 +82,7 @@ public class SpannerClient {
         // Determine leaders.
         for (Map.Entry entry : sMap.entrySet()) {
             int clusterId = (Integer) entry.getKey();
-            for (AddressConfig address : SpannerUtils.getClusterIPs(clusterId)) {
+            for (AddressConfig address : SpannerUtils.getReplicaClusterIPs(clusterId)) {
                 try {
                     socket = new Socket(address.host(), address.getClientPort());
                     reader = new Scanner(new InputStreamReader(socket.getInputStream()));

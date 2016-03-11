@@ -30,35 +30,35 @@ public class SpannerUtils {
         return client;
     }
 
-    public static int getClusterID(Object key) {
+    public static int getReplicaClusterID(Object key) {
         int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
         return index;
     }
 
-    public static List<AddressConfig> getClusterIPs(Object key) {
+    public static List<AddressConfig> getReplicaClusterIPs(Object key) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 
-    public static List<AddressConfig> getClusterIPs(int index) {
+    public static List<AddressConfig> getReplicaClusterIPs(int index) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 
     // Just checks is my ip is equal to given host, no port matching
     public static boolean isThisMyIpAddress(String host) {
-        if (host == "localhost")
+        if (host.equals("localhost"))
             return true;
 
-        if (host == getMyInternetIP()) {
+        if (host.equals(getMyInternetIP())) {
             return true;
         }
         return false;
     }
 
     public static String getMyInternetIP() {
-        BufferedReader in = null;
+        BufferedReader in;
         String ip = "";
         try {
             URL whatismyip = new URL("http://checkip.amazonaws.com");
