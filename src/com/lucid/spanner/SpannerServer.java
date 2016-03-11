@@ -161,7 +161,8 @@ public class SpannerServer {
         switch (msgType) {
             case PREPARE_ACK:
                 if (!iAmCoordinator(tid)) {
-                    LogUtils.error(LOG_TAG, "PrepareAck recd at non-coordinator");
+                    LogUtils.error(LOG_TAG, "PrepareAck recd at non-coordinator from server " + cohort.getInetAddress
+                            ().getHostName() + cohort.getPort());
                 } else {
                     twoPC.recvPrepareAck(tid);
                 }
