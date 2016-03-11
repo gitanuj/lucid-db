@@ -1,6 +1,7 @@
 package com.lucid.spanner;
 
 import com.lucid.common.LogUtils;
+import com.lucid.ycsb.YCSBClient;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
@@ -13,27 +14,23 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-public class SpannerClient {
+public class SpannerClient implements YCSBClient {
 
     private static final String LOG_TAG = "SPANNER_CLIENT";
 
-    private static final SpannerClient INSTANCE = new SpannerClient();
-
     private CopycatClient copycatClient;
 
-    public static SpannerClient getInstance() {
-        return INSTANCE;
-    }
-
-    private SpannerClient() {
+    public SpannerClient() {
         copycatClient = SpannerUtils.buildClient(SpannerUtils.toAddress(Config.SERVER_IPS));
         copycatClient.open().join();
     }
 
+    @Override
     public String executeQuery(Query query) throws InterruptedException, ExecutionException, TimeoutException {
         return (String) copycatClient.submit(query).get(Config.READ_QUERY_TIMEOUT, TimeUnit.MILLISECONDS);
     }
 
+    @Override
     public boolean executeCommand(Command command) throws UnexpectedCommand {
 
         if (command instanceof WriteCommand) {

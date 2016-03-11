@@ -1,7 +1,6 @@
 package com.lucid.ycsb;
 
 import com.lucid.common.LogUtils;
-import com.lucid.spanner.SpannerClient;
 import com.lucid.spanner.WriteCommand;
 
 import java.util.ArrayList;
@@ -45,6 +44,8 @@ public class Batcher {
     // Thread ID vs Result map
     private final Map<Long, Boolean> resultMap = new HashMap<>();
 
+    private YCSBClient ycsbClient;
+
     private ScheduledFuture lastBatchExpiryTask;
 
     private long txnIdSequence = 0;
@@ -54,6 +55,10 @@ public class Batcher {
 
     public static Batcher getInstance() {
         return INSTANCE;
+    }
+
+    public void setYCSBClient(YCSBClient ycsbClient) {
+        this.ycsbClient = ycsbClient;
     }
 
     public boolean write(WriteObject writeObject) {
@@ -170,7 +175,7 @@ public class Batcher {
             boolean result = false;
             try {
                 WriteCommand writeCommand = new WriteCommand(txnId, YCSBUtils.toCommandsMap(batch));
-                result = SpannerClient.getInstance().executeCommand(writeCommand);
+                result = ycsbClient.executeCommand(writeCommand);
             } catch (Exception e) {
                 e.printStackTrace();
             }
