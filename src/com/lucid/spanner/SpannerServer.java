@@ -26,7 +26,7 @@ import java.util.function.Consumer;
 
 public class SpannerServer {
 
-    private static final String LOG_TAG = "SPANNER_SERVER";
+    private final String LOG_TAG;
     private int index;
     private String host;
     private int clientPort;
@@ -43,8 +43,11 @@ public class SpannerServer {
 
     private TwoPC twoPC;
 
-    SpannerServer(AddressConfig addressConfig, int index) {
+    private final Striped<Lock> stripedLocks = Striped.lazyWeakLock(100);
+
+    public SpannerServer(AddressConfig addressConfig, int index) {
         Lucid.getInstance().onServerStarted();
+        LOG_TAG = "SPANNER_SERVER-" + index;
 
         this.index = index;
         this.host = addressConfig.host();
@@ -434,7 +437,7 @@ public class SpannerServer {
         try {
             LogUtils.debug(LOG_TAG, "Txn " + tid + " is waiting for locks.");
             for (String key : keys) {
-                locks[counter] = Locker.getLock(key);
+                locks[counter] = stripedLocks.get(key);
                 locks[counter].lock();
                 counter++;
             }
@@ -589,15 +592,5 @@ class TwoPC {
             return true;
         else
             return false;
-    }
-}
-
-class Locker {
-    private static final String LOG_TAG = "LOCKER";
-
-    private static final Striped<Lock> sLock = Striped.lazyWeakLock(100);
-
-    public static Lock getLock(String lockId) {
-        return sLock.get(lockId);
     }
 }
