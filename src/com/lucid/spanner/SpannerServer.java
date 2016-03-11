@@ -503,6 +503,10 @@ class TState {
         //commit_count = 0;
     }
 
+    public void reInitSemaphore(int numShards){
+        prepareCount = new Semaphore(-1 * numShards + 1);;
+    }
+
     @Override
     public String toString() {
         return "[TState] Shards:" + numShards + " PrepareCount" + prepareCount + "\n";
@@ -522,6 +526,8 @@ class TwoPC {
         LogUtils.debug(LOG_TAG, "Adding txn " + tid + " to active map");
         if (txnState.containsKey(tid)) {
             LogUtils.error(LOG_TAG, "Add Txn called multiple times for same tid.");
+            TState tState = txnState.get(tid);
+            tState.reInitSemaphore(nShards);
             //TState tState = txnState.get(tid);
             //tState.numShards = nShards;  // In case where Coordinator receives prepare after other leaders
             return;
