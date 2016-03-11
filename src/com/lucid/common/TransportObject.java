@@ -13,6 +13,7 @@ public class TransportObject implements Serializable{
     private Map<String, String> writeMap;
     private AddressConfig coordinator;
     private int number_of_leaders;
+    private String key;
 
     private boolean isCoordinator;
 
@@ -21,12 +22,25 @@ public class TransportObject implements Serializable{
         writeMap = map;
     }
 
+    public TransportObject(long id, String key){
+        this.txn_id = id;
+        this.key = key;
+    }
+
     public TransportObject(AddressConfig coord, long id, Map<String, String> map, int num, boolean isC){
         this.txn_id = id;
         writeMap = map;
         this.coordinator = coord;
         this.number_of_leaders = num;
         this.isCoordinator = isC;
+    }
+
+    public String getKey() {
+        return key;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
     }
 
     public int getNumber_of_leaders() {

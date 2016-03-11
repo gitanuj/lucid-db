@@ -63,10 +63,10 @@ public class RCClient implements YCSBClient {
             try {
                 Socket socket = new Socket(server.host(), server.getClientPort());
                 writer = new ObjectOutputStream(socket.getOutputStream());
-                writer.write(new TransportObject())
+                writer.writeObject(new TransportObject(Config.TXN_ID_NOT_APPLICABLE, query.key()));
             }
             catch(Exception e){
-                LogUtils.debug(LOG_TAG, "Could not connect to server.", e);
+                LogUtils.debug(LOG_TAG, "Error in talking to server.", e);
             }
         }
     }
