@@ -167,9 +167,9 @@ public class SpannerServer {
                 if (!iAmCoordinator(tid)) {
                     LogUtils.error(LOG_TAG, "PrepareAck recd at non-coordinator from server " + cohort.getInetAddress
                             ().getHostName() + cohort.getPort());
-                } else {
-                    twoPC.recvPrepareAck(tid);
                 }
+                twoPC.recvPrepareAck(tid);
+
                 break;
 
             case COMMIT:
@@ -188,9 +188,8 @@ public class SpannerServer {
             case PREPARE_NACK:
                 if (!iAmCoordinator(tid)) {
                     LogUtils.error(LOG_TAG, "PrepareNack recd at non-coordinator");
-                } else {
-                    twoPC.recvPrepareAck(tid);
                 }
+                twoPC.recvPrepareAck(tid);
                 break;
 
             case ABORT:
@@ -450,7 +449,7 @@ public class SpannerServer {
     }
 
     private void tryReleaseLocks(long tid) {
-        if(lockMap.containsKey(tid))
+        if (lockMap.containsKey(tid))
             releaseLocks(tid);
     }
 
@@ -520,6 +519,7 @@ class TwoPC {
     }
 
     public void addNewTxn(long tid, int nShards) {
+        LogUtils.debug(LOG_TAG, "Adding txn " + tid + " to active map");
         if (txnState.containsKey(tid)) {
             LogUtils.error(LOG_TAG, "Add Txn called multiple times for same tid.");
             //TState tState = txnState.get(tid);
@@ -530,6 +530,7 @@ class TwoPC {
     }
 
     public TState removeTxn(long tid) {
+        LogUtils.debug(LOG_TAG, "Removing txn " + tid + " from active map.");
         return txnState.remove(tid);
     }
 
@@ -557,8 +558,8 @@ class TwoPC {
         if (!txnState.containsKey(tid)) {
             // When prepare ack from other Leaders is recd after prepare from client
             LogUtils.error(LOG_TAG, "Recd prepareAck but Txn does not exist tid:" + tid);
-            return;
-            //addNewTxn(tid, Config.NUM_CLUSTERS);
+            //return;
+            addNewTxn(tid, Config.NUM_CLUSTERS);
         }
         TState tState = txnState.get(tid);
         tState.prepareCount.release();
