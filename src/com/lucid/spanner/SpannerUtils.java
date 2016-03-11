@@ -74,7 +74,7 @@ public class SpannerUtils {
 
     public static List<AddressConfig> getPaxosClusterAll(int index) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
-        int position = index % clusterSize;
+        int position = index / clusterSize;
         return getReplicaClusterIPs(position);
     }
 
