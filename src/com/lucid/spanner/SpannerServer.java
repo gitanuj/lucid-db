@@ -89,6 +89,7 @@ public class SpannerServer {
             @Override
             public void accept(CopycatServer.State state) {
                 role = state;
+                LogUtils.debug(LOG_TAG, "State updated: " + role.name());
             }
         });
         server.serializer().disableWhitelist();
