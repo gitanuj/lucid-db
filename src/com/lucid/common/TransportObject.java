@@ -16,6 +16,11 @@ public class TransportObject implements Serializable{
 
     private boolean isCoordinator;
 
+    public TransportObject(long id, Map<String, String> map){
+        this.txn_id = id;
+        writeMap = map;
+    }
+
     public TransportObject(AddressConfig coord, long id, Map<String, String> map, int num, boolean isC){
         this.txn_id = id;
         writeMap = map;

@@ -11,6 +11,7 @@ public final class Config {
 
     public static final int NUM_CLUSTERS = 3;
     public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
+    public static final long TXN_ID_NOT_APPLICABLE = -1;
 
     // SERVER_IPS list structure - contiguous blocks of shard replicas.
     static {
