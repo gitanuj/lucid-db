@@ -21,4 +21,8 @@ public class WriteCommand implements Command<Object> {
     public Map<String, String> getWriteCommands() {
         return this.commands;
     }
+
+    public String getFirstKeyInThisCommand(){
+        return commands.entrySet().iterator().next().getKey();
+    }
 }

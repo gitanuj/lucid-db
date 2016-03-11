@@ -22,4 +22,14 @@ public class Utils {
         int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
+
+    public static int getReplicaClusterID(Object key) {
+        int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
+        return index;
+    }
+
+    public static List<AddressConfig> getReplicaClusterIPs(int index) {
+        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
+        return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
+    }
 }

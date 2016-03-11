@@ -65,7 +65,7 @@ public class SpannerClient implements YCSBClient {
 
         // Accumulate keys mapped to the same clusters.
         for (Map.Entry entry : commands.entrySet()) {
-            int clusterId = SpannerUtils.getReplicaClusterID(entry.getKey());
+            int clusterId = Utils.getReplicaClusterID(entry.getKey());
             List<String> list = sMap.get(clusterId);
             if (list == null) {
                 list = new ArrayList<>();
@@ -81,7 +81,7 @@ public class SpannerClient implements YCSBClient {
         // Determine leaders.
         for (Map.Entry entry : sMap.entrySet()) {
             int clusterId = (Integer) entry.getKey();
-            for (AddressConfig address : SpannerUtils.getReplicaClusterIPs(clusterId)) {
+            for (AddressConfig address : Utils.getReplicaClusterIPs(clusterId)) {
                 try {
                     socket = new Socket(address.host(), address.getClientPort());
                     reader = new Scanner(new InputStreamReader(socket.getInputStream()));

@@ -2,6 +2,7 @@ package com.lucid.spanner;
 
 import com.lucid.common.AddressConfig;
 import com.lucid.common.Config;
+import com.lucid.common.Utils;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
 import io.atomix.copycat.client.CopycatClient;
@@ -27,16 +28,6 @@ public class SpannerUtils {
         return client;
     }
 
-    public static int getReplicaClusterID(Object key) {
-        int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
-        return index;
-    }
-
-    public static List<AddressConfig> getReplicaClusterIPs(int index) {
-        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
-    }
-    
     // Just checks is my ip is equal to given host, no port matching
     public static boolean isThisMyIpAddress(String host) {
         if (host.equals("localhost"))
@@ -66,7 +57,7 @@ public class SpannerUtils {
     public static List<AddressConfig> getPaxosClusterAll(int index) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
         int position = index / clusterSize;
-        return getReplicaClusterIPs(position);
+        return Utils.getReplicaClusterIPs(position);
     }
 
     public static Thread startThreadWithName(Runnable runnable, String name) {
