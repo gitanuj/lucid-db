@@ -14,11 +14,9 @@ public final class Config {
     public static final int NUM_CLUSTERS = 1;
     public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
 
+    // SERVER_IPS list structure - contiguous blocks of shard replicas.
     static {
         String host = "127.0.0.1";
-//        try {
-//            host = InetAddress.getLocalHost().getHostName();
-//        } catch (Exception e) {}
 
         SERVER_IPS.add(new AddressConfig(host, 9000, 9100, 9200));
         SERVER_IPS.add(new AddressConfig(host, 9001, 9101, 9201));
