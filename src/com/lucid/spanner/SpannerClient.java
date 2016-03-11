@@ -93,11 +93,12 @@ public class SpannerClient implements YCSBClient {
                             coordinatorSocket = socket;
                             LogUtils.debug(LOG_TAG, " Coordinator for transaction " + ((WriteCommand)
                                     command)
-                                    .getTxn_id() + " is " + coordinatorSocket.getInetAddress().getHostAddress());
+                                    .getTxn_id() + " is " + coordinatorSocket.getInetAddress().getHostAddress() + ":"
+                                    + coordinatorSocket.getPort());
                             coordinatorAddress = address;
                         }
                         LogUtils.debug(LOG_TAG, " Leader for Cluster ID " + clusterId + " is " +
-                                address.host());
+                                address.host() + ":" + address.getClientPort());
                         sessionMap.put(clusterId, socket);
 
                         // Leader found.
@@ -135,12 +136,14 @@ public class SpannerClient implements YCSBClient {
 
         // Wait for response from coordinator and pass it on to caller.
         try {
+            LogUtils.debug(LOG_TAG, "Waiting for response from coordinator " + coordinatorSocket.getInetAddress()
+                    .getHostName() + ":" + coordinatorSocket.getPort());
             reader = new Scanner(new InputStreamReader(coordinatorSocket.getInputStream()));
             String result = reader.next();
             LogUtils.debug(LOG_TAG, "Message received from coordinator: " + result + ". Commit cluster IDs at which " +
                     "commit was applied:");
             for(Map.Entry<Integer, List<String>> map : sMap.entrySet())
-                LogUtils.debug(LOG_TAG, (map.getKey()).toString());
+                System.out.println(map.getKey());
 
             System.out.println();
 

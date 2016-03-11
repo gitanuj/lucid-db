@@ -27,7 +27,7 @@ public class SpannerDBTester {
         SpannerDB spannerDB = new SpannerDB();
 
         // TODO Fails test for 1000 threads. Investigate!
-        for (int i = 0; i < 80; i++) {
+        for (int i = 0; i < 5; i++) {
             final int id = i;
             Thread t = new Thread(() -> {
                 String table = "table";
