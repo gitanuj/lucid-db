@@ -11,7 +11,7 @@ public class LogUtils {
 
     private static final LogLevel LOG_LEVEL = LogLevel.DEBUG;
 
-    private static final boolean ENABLE_COPYCAT_DEBUG_LOGS = true;
+    private static final boolean ENABLE_COPYCAT_DEBUG_LOGS = false;
 
     private static final Logger LOGGER = new PrintLogger();
 
