@@ -2,9 +2,6 @@ package com.lucid.common;
 
 import java.io.Closeable;
 
-/**
- * Created by tanuj on 3/1/16.
- */
 public class Utils {
 
     private static final String LOG_TAG = "UTILS";

@@ -1,5 +1,6 @@
 package com.lucid.ycsb;
 
+import com.lucid.common.LogUtils;
 import com.lucid.spanner.ReadQuery;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.DB;
@@ -11,6 +12,8 @@ import java.util.Set;
 import java.util.Vector;
 
 public abstract class YCSBDB extends DB {
+
+    private static final String LOG_TAG = "YCSB_DB";
 
     private YCSBClient ycsbClient;
 
@@ -33,7 +36,7 @@ public abstract class YCSBDB extends DB {
             }
             return Status.OK;
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.error(LOG_TAG, "Failed to read", e);
             return Status.ERROR;
         }
     }
@@ -50,8 +53,6 @@ public abstract class YCSBDB extends DB {
 
     @Override
     public Status insert(String table, String key, HashMap<String, ByteIterator> values) {
-        Batcher.getInstance().setYCSBClient(getYCSBClient());
-
         try {
             String qualifiedKey = YCSBUtils.createQualifiedKey(table, key);
             WriteObject writeObject = new WriteObject();
@@ -62,7 +63,7 @@ public abstract class YCSBDB extends DB {
             }
             return Status.ERROR;
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.error(LOG_TAG, "Failed to write", e);
             return Status.ERROR;
         }
     }

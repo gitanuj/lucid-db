@@ -177,7 +177,7 @@ public class Batcher {
                 WriteCommand writeCommand = new WriteCommand(txnId, YCSBUtils.toCommandsMap(batch));
                 result = ycsbClient.executeCommand(writeCommand);
             } catch (Exception e) {
-                e.printStackTrace();
+                LogUtils.error(LOG_TAG, "Failed to executeCommand", e);
             }
 
             try {

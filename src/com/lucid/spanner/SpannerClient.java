@@ -1,6 +1,7 @@
 package com.lucid.spanner;
 
 import com.lucid.common.LogUtils;
+import com.lucid.common.Lucid;
 import com.lucid.ycsb.YCSBClient;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
@@ -21,6 +22,8 @@ public class SpannerClient implements YCSBClient {
     private CopycatClient copycatClient;
 
     public SpannerClient() {
+        Lucid.getInstance().onClientStarted();
+
         copycatClient = SpannerUtils.buildClient(SpannerUtils.toAddress(Config.SERVER_IPS));
         copycatClient.open().join();
     }
