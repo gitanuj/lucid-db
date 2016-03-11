@@ -494,25 +494,29 @@ class TState {
         COMMIT, ABORT, UNKNOWN
     }
 
-    int numShards;
+    int numOtherShards;
     Semaphore prepareCount;
     CSTATE commit;
-    //int commit_count;
 
-    public TState(int nShards) {
-        numShards = nShards;
-        prepareCount = new Semaphore(-1 * nShards + 1);
+    public TState() {
+        numOtherShards = Config.NUM_CLUSTERS-1;
+        prepareCount = new Semaphore(0);
         commit = CSTATE.UNKNOWN;
-        //commit_count = 0;
     }
 
-    public void reInitSemaphore(int numShards){
-        prepareCount = new Semaphore(-1 * numShards + 1);;
+    public TState(int nOtherShards) {
+        numOtherShards = nOtherShards;
+        prepareCount = new Semaphore(0);
+        commit = CSTATE.UNKNOWN;
+    }
+
+    public void reInitNumShards(int nOtherShards){
+        this.numOtherShards = nOtherShards;
     }
 
     @Override
     public String toString() {
-        return "[TState] Shards:" + numShards + " PrepareCount" + prepareCount + "\n";
+        return "[TState] Shards:" + numOtherShards + " PrepareCount" + prepareCount + "\n";
     }
 }
 
@@ -525,14 +529,21 @@ class TwoPC {
         txnState = new ConcurrentHashMap<>();
     }
 
+    public void addNewTxn(long tid) {
+        LogUtils.debug(LOG_TAG, "Adding txn " + tid + " to active map");
+        if (txnState.containsKey(tid)) {
+            TState tState = txnState.get(tid);
+            return;
+        }
+        txnState.put(tid, new TState());
+    }
+
     public void addNewTxn(long tid, int nShards) {
         LogUtils.debug(LOG_TAG, "Adding txn " + tid + " to active map");
         if (txnState.containsKey(tid)) {
-            LogUtils.error(LOG_TAG, "Add Txn called multiple times for same tid.");
+            LogUtils.debug(LOG_TAG, "Add Txn called multiple times for same tid.");
             TState tState = txnState.get(tid);
-            tState.reInitSemaphore(nShards);
-            //TState tState = txnState.get(tid);
-            //tState.numShards = nShards;  // In case where Coordinator receives prepare after other leaders
+            tState.reInitNumShards(nShards);
             return;
         }
         txnState.put(tid, new TState(nShards));
@@ -553,9 +564,9 @@ class TwoPC {
 
     public void waitForPrepareAcks(long tid) {
         TState tState = txnState.get(tid);
-        int nshards = tState.numShards;
+        int nShards = tState.numOtherShards;
         try {
-            tState.prepareCount.acquire(nshards);
+            tState.prepareCount.acquire(nShards);
             if (tState.commit != TState.CSTATE.ABORT)    // Haven't recd NACK
                 tState.commit = TState.CSTATE.COMMIT;
         } catch (Exception e) {
@@ -565,10 +576,10 @@ class TwoPC {
 
     public void recvPrepareAck(long tid) {
         if (!txnState.containsKey(tid)) {
-            // When prepare ack from other Leaders is recd after prepare from client
-            LogUtils.error(LOG_TAG, "Recd prepareAck but Txn does not exist tid:" + tid);
+            // When prepare ack from other Leaders is recd before prepare from client
+            LogUtils.debug(LOG_TAG, "Recd prepareAck but Txn does not exist tid:" + tid);
             //return;
-            addNewTxn(tid, Config.NUM_CLUSTERS);
+            addNewTxn(tid);
         }
         TState tState = txnState.get(tid);
         tState.prepareCount.release();
@@ -576,14 +587,13 @@ class TwoPC {
 
     public void recvPrepareNack(long tid) {
         if (!txnState.containsKey(tid)) {
-            // When prepare ack from other Leaders is recd after prepare from client
-            LogUtils.error(LOG_TAG, "Recd prepareNack but Txn does not exist tid:" + tid);
-            return;
-            //addNewTxn(tid, Config.NUM_CLUSTERS);
+            // When prepare Nack from other Leaders is recd before prepare from client
+            LogUtils.debug(LOG_TAG, "Recd prepareNack but Txn does not exist tid:" + tid);
+            addNewTxn(tid);
         }
         TState tState = txnState.get(tid);
         tState.commit = TState.CSTATE.ABORT;
-        tState.prepareCount.release(tState.numShards);  // Semaphore released immediately to let know waiting server
+        tState.prepareCount.release(tState.numOtherShards);  // Semaphore released immediately to let know waiting server
     }
 
     public boolean canCommit(long tid) {
