@@ -463,6 +463,7 @@ public class SpannerServer {
                     lock.unlock();
                 } catch (Exception e) {
                     LogUtils.error(LOG_TAG, "Exception while Unlocking for txn tid:" + tid, e);
+                    //TODO: add this lock to a global Unlocks list that should periodically run to release unheld locks
                 }
                 lockMap.remove(tid);
             }
