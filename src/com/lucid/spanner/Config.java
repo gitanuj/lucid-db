@@ -1,8 +1,5 @@
 package com.lucid.spanner;
 
-import io.atomix.catalyst.transport.Address;
-
-import java.net.InetAddress;
 import java.util.*;
 
 public final class Config {
