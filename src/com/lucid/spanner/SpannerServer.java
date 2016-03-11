@@ -26,7 +26,7 @@ import java.util.function.Consumer;
 
 public class SpannerServer {
 
-    private static final String LOG_TAG = "SPANNER_SERVER";
+    private final String LOG_TAG;
     private int index;
     private String host;
     private int clientPort;
@@ -43,8 +43,9 @@ public class SpannerServer {
 
     private TwoPC twoPC;
 
-    SpannerServer(AddressConfig addressConfig, int index) {
+    public SpannerServer(AddressConfig addressConfig, int index) {
         Lucid.getInstance().onServerStarted();
+        LOG_TAG = "SPANNER_SERVER-" + index;
 
         this.index = index;
         this.host = addressConfig.host();
