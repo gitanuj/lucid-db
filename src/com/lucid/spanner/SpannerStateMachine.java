@@ -13,18 +13,19 @@ import java.util.Map;
 public class SpannerStateMachine extends StateMachine implements Snapshottable {
 
     private static final String LOG_TAG = "SPANNER_STATE_MACHINE";
-    private Map<String, String> map = new HashMap<>();
+
+    private Map<String, String> MAP = new HashMap<>();
 
     @Override
     public void snapshot(SnapshotWriter writer) {
         // Serialize the map to the snapshot
-        writer.writeObject(map);
+        writer.writeObject(MAP);
     }
 
     @Override
     public void install(SnapshotReader reader) {
         // Read the snapshotted map
-        map = reader.readObject();
+        MAP = reader.readObject();
     }
 
     public void write(Commit<WriteCommand> commit) {
@@ -32,7 +33,7 @@ public class SpannerStateMachine extends StateMachine implements Snapshottable {
             LogUtils.debug(LOG_TAG, "Applying WriteCommand command.");
             Map<String, String> map = commit.operation().getWriteCommands();
             for (String key : map.keySet()) {
-                map.put(key, map.get(key));
+                MAP.put(key, map.get(key));
             }
         } finally {
             commit.close();
@@ -42,8 +43,8 @@ public class SpannerStateMachine extends StateMachine implements Snapshottable {
     public String read(Commit<ReadQuery> commit) {
         try {
             String key = commit.operation().key();
-            LogUtils.debug(LOG_TAG, "Received Read Query for key:"+key);
-            return map.get(key);
+            LogUtils.debug(LOG_TAG, "Received Read Query for key:" + key);
+            return MAP.get(key);
         } finally {
             commit.close();
         }
