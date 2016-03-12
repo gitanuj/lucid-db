@@ -15,7 +15,7 @@ public class Lucid {
 
     // Need this to init logging config
     private void init() {
-        LogUtils.debug(LOG_TAG, "log init");
+        LogUtils.init();
     }
 
     public void onClientStarted() {

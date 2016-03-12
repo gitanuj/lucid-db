@@ -60,13 +60,6 @@ public class SpannerUtils {
         return Utils.getReplicaClusterIPs(position);
     }
 
-    public static Thread startThreadWithName(Runnable runnable, String name) {
-        Thread thread = new Thread(runnable);
-        thread.setName(name);
-        thread.start();
-        return thread;
-    }
-
     public static List<Address> toAddress(List<AddressConfig> addressConfigList) {
         List<Address> addressList = new ArrayList<>();
         for (AddressConfig addressConfig : addressConfigList) {

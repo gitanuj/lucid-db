@@ -47,6 +47,9 @@ public class LogUtils {
         root.setLevel(level);
     }
 
+    public static void init() {
+    }
+
     public static void debug(String tag, String message, Throwable throwable) {
         LOGGER.debug(getLogMessage(tag, message), throwable);
     }

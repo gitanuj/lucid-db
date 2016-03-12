@@ -1,6 +1,7 @@
 package com.lucid.common;
 
 import java.io.Closeable;
+import java.util.ArrayList;
 import java.util.List;
 
 public class Utils {
@@ -31,5 +32,23 @@ public class Utils {
     public static List<AddressConfig> getReplicaClusterIPs(int index) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
+    }
+
+    public static Thread startThreadWithName(Runnable runnable, String name) {
+        Thread thread = new Thread(runnable);
+        thread.setName(name);
+        thread.start();
+        return thread;
+    }
+
+    public static List<AddressConfig> getDatacenterIPs(int index) {
+        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
+        int offset = index % clusterSize;
+
+        List<AddressConfig> list = new ArrayList<>();
+        for (int i = offset; i < Config.SERVER_IPS.size(); i += clusterSize) {
+            list.add(Config.SERVER_IPS.get(i));
+        }
+        return list;
     }
 }

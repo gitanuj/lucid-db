@@ -2,8 +2,8 @@ package com.lucid.ycsb;
 
 import com.lucid.common.AddressConfig;
 import com.lucid.common.Config;
-import com.lucid.spanner.SpannerServer;
-import com.lucid.spanner.SpannerUtils;
+import com.lucid.common.Utils;
+import com.lucid.rc.RCServer;
 
 public class StartServers {
 
@@ -12,9 +12,9 @@ public class StartServers {
         for (int i = 0; i < Config.SERVER_IPS.size(); i++) {
             final int index = i;
 
-            SpannerUtils.startThreadWithName(() -> {
+            Utils.startThreadWithName(() -> {
                 AddressConfig config = Config.SERVER_IPS.get(index);
-                new SpannerServer(config, index);
+                new RCServer(config, index);
             }, "server-" + i);
         }
     }

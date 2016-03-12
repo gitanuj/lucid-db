@@ -118,7 +118,7 @@ public class SpannerServer {
                 }
             }
         };
-        SpannerUtils.startThreadWithName(serverRunnable, "ServerAccept Thread at Server " + host + ":" + serverPort);
+        Utils.startThreadWithName(serverRunnable, "ServerAccept Thread at Server " + host + ":" + serverPort);
         LogUtils.debug(LOG_TAG, "Started thread for accepting cohort messages at " + host + ":" + serverPort);
     }
 
@@ -227,7 +227,7 @@ public class SpannerServer {
                 }
             }
         };
-        SpannerUtils.startThreadWithName(clientRunnable, "ClientAccept Thread at Server " + host + ":" + clientPort);
+        Utils.startThreadWithName(clientRunnable, "ClientAccept Thread at Server " + host + ":" + clientPort);
         LogUtils.debug(LOG_TAG, "Started thread for accepting client messages at " + host + ":" + clientPort);
     }
 
@@ -316,7 +316,7 @@ public class SpannerServer {
                 }
             }
         };
-        SpannerUtils.startThreadWithName(clientRunnable, "Client Handling thread for client:" + client.getInetAddress());
+        Utils.startThreadWithName(clientRunnable, "Client Handling thread for client:" + client.getInetAddress());
     }
 
     /* After receiving PREPARE_ACKs from everyone, txn is ready for commit.
