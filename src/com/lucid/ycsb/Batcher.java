@@ -40,7 +40,7 @@ public class Batcher {
 
     private final Map<Long, Semaphore> waitingLocks = new HashMap<>();
 
-    private final Map<Long, Boolean> resultMap = new HashMap<>();
+    private final Map<Long, Pair<Boolean, Integer>> resultMap = new HashMap<>();
 
     private YCSBClient ycsbClient;
 
@@ -117,15 +117,19 @@ public class Batcher {
 
     private void notifyCompletion(long txnId, boolean result, int numWaitingThreads) {
         synchronized (resultMap) {
-            resultMap.put(txnId, result);
+            resultMap.put(txnId, new Pair<>(result, numWaitingThreads));
             waitingLocks.remove(txnId).release(numWaitingThreads);
         }
     }
 
     private boolean checkResult(long txnId) {
         synchronized (resultMap) {
-            // TODO When to remove result from map?
-            return resultMap.get(txnId);
+            Pair<Boolean, Integer> pair = resultMap.get(txnId);
+            pair.setObj2(pair.getObj2() - 1);
+            if (pair.getObj2() == 0) {
+                resultMap.remove(txnId);
+            }
+            return pair.getObj1();
         }
     }
 

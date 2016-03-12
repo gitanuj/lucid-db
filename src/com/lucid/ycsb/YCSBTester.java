@@ -22,8 +22,8 @@ public class YCSBTester {
     private static void testSpannerDb() {
 
         YCSBDB ycsbdb = new DummyDB();
-        
-        for (int i = 0; i < 100; i++) {
+
+        for (int i = 0; i < 1000; i++) {
             final int id = i;
             Thread t = new Thread(() -> {
                 String table = "table";
