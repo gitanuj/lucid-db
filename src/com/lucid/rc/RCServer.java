@@ -187,15 +187,16 @@ public class RCServer {
     }
 
     private void handle2PCAccept(ServerMsg msg) throws Exception {
+        // Create counter
         AtomicInteger atomicCounter;
         synchronized (counter) {
-            // Create counter
             atomicCounter = counter.get(msg.getTxn_id());
             if (atomicCounter == null) {
                 atomicCounter = new AtomicInteger();
                 counter.put(msg.getTxn_id(), atomicCounter);
             }
         }
+
         int total = replicaOutputStreams.size();
         int count = atomicCounter.incrementAndGet();
         if (count == total / 2 + 1) {
@@ -218,7 +219,7 @@ public class RCServer {
 
     private void handle2PCCommit(ServerMsg msg) throws Exception {
         // Commit values
-        stateMachine.write(msg.getMap());
+        stateMachine.write(msg.getTxn_id(), msg.getMap());
 
         // Release txn locks
         releaseTxnLocks(msg);
@@ -275,8 +276,7 @@ public class RCServer {
     private void handleClientMsg(TransportObject msg, ObjectOutputStream outputStream) throws Exception {
         if (msg.getKey() != null) {
             // Read query
-            String value = stateMachine.read(msg.getKey());
-            // TODO format for value?
+            Pair<Long, String> value = stateMachine.read(msg.getKey());
             outputStream.writeObject(value);
         } else {
             // Write command
@@ -292,7 +292,7 @@ public class RCServer {
             ackLocks.get(msg.getTxn_id()).acquire(datacenterOutputStreams.size());
 
             // Inform replicas and client
-            // TODO how to inform client of success?
+            outputStream.writeObject("COMMIT:" + msg.getTxn_id());
             ServerMsg ack2PCPrepare = new ServerMsg(Message.ACK_2PC_PREPARE, serverMsg);
             for (ObjectOutputStream oos : replicaOutputStreams.values()) {
                 oos.writeObject(ack2PCPrepare);

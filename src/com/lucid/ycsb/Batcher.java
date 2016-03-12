@@ -1,6 +1,7 @@
 package com.lucid.ycsb;
 
 import com.lucid.common.LogUtils;
+import com.lucid.common.Pair;
 import com.lucid.common.WriteCommand;
 
 import java.util.ArrayList;
@@ -125,11 +126,11 @@ public class Batcher {
     private boolean checkResult(long txnId) {
         synchronized (resultMap) {
             Pair<Boolean, Integer> pair = resultMap.get(txnId);
-            pair.setObj2(pair.getObj2() - 1);
-            if (pair.getObj2() == 0) {
+            pair.setSecond(pair.getSecond() - 1);
+            if (pair.getSecond() == 0) {
                 resultMap.remove(txnId);
             }
-            return pair.getObj1();
+            return pair.getFirst();
         }
     }
 
