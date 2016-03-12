@@ -2,7 +2,6 @@ package com.lucid.ycsb;
 
 import com.lucid.common.LogUtils;
 import com.yahoo.ycsb.ByteIterator;
-import com.yahoo.ycsb.CommandLine;
 import com.yahoo.ycsb.RandomByteIterator;
 import com.yahoo.ycsb.Status;
 
@@ -10,9 +9,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-public class SpannerDBTester {
+public class YCSBTester {
 
-    private static final String LOG_TAG = "SPANNER_DB_TESTER";
+    private static final String LOG_TAG = "YCSB_TESTER";
 
     private static final List<Thread> THREADS = new ArrayList<>();
 
@@ -22,21 +21,18 @@ public class SpannerDBTester {
 
     private static void testSpannerDb() {
 
-        CommandLine commandLine = new CommandLine();
-
-        SpannerDB spannerDB = new SpannerDB();
-
-        // TODO Fails test for 1000 threads. Investigate!
-        for (int i = 0; i < 5; i++) {
+        YCSBDB ycsbdb = new DummyDB();
+        
+        for (int i = 0; i < 100; i++) {
             final int id = i;
             Thread t = new Thread(() -> {
                 String table = "table";
                 String key = "key" + String.valueOf(id);
                 HashMap<String, ByteIterator> values = generateRandomValues();
 
-                Status status = spannerDB.insert(table, key, values);
-                LogUtils.error(LOG_TAG, id + " write: " + status);
-            }, "spanner-db-tester-" + id);
+                Status status = ycsbdb.insert(table, key, values);
+                LogUtils.debug(LOG_TAG, id + " write: " + status);
+            }, "ycsb-tester-" + id);
             THREADS.add(t);
         }
 
