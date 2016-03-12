@@ -55,7 +55,9 @@ public class RCClient implements YCSBClient {
         LogUtils.debug(LOG_TAG, "Number of read request-threads made: " + readThreadsCounter);
 
         // Sleep till notified either when a majority of requests have come back, or more than 10 seconds have elapsed.
-        readsWaitOnMe.wait(10 * 1000);
+        synchronized(readsWaitOnMe){
+            readsWaitOnMe.wait(10 * 1000);
+        }
 
         // Interrupt all running read threads.
         interruptAllRunningThreads(clientRequests, readThreadsCounter);
@@ -100,7 +102,9 @@ public class RCClient implements YCSBClient {
                 LogUtils.debug(LOG_TAG, "Number of write request-threads made: " + writeThreadsCounter);
 
                 // Sleep till notified either when a majority of requests have come back, or more than 10 seconds have elapsed.
-                writesWaitOnMe.wait(10 * 1000);
+                synchronized (writesWaitOnMe){
+                    writesWaitOnMe.wait(10 * 1000);
+                }
 
                 // Interrupt all running read threads.
                 interruptAllRunningThreads(clientRequests, writeThreadsCounter);
