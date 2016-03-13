@@ -37,15 +37,15 @@ public class RCServer {
 
     private final List<AddressConfig> replicasIPs;
 
-    private final Map<AddressConfig, ObjectOutputStream> datacenterOutputStreams;
+    private final Map<AddressConfig, ObjectOutputStream> datacenterOutputStreams = new HashMap<>();
 
-    private final Map<AddressConfig, ObjectOutputStream> replicaOutputStreams;
+    private final Map<AddressConfig, ObjectOutputStream> replicaOutputStreams = new HashMap<>();
 
-    private final Map<Long, List<Semaphore>> txnLocks;
+    private final Map<Long, List<Semaphore>> txnLocks = new HashMap<>();
 
-    private final Map<Long, Semaphore> ackLocks;
+    private final Map<Long, Semaphore> ackLocks = new HashMap<>();
 
-    private final Map<Long, AtomicInteger> counter;
+    private final Map<Long, AtomicInteger> counter = new HashMap<>();
 
     private final StripedExclusiveSemaphore stripedSemaphore = new StripedExclusiveSemaphore(512);
 
@@ -59,13 +59,8 @@ public class RCServer {
         this.clientPort = addressConfig.getClientPort();
         this.serverPort = addressConfig.getServerPort();
         this.stateMachine = new RCStateMachine();
-        this.datacenterOutputStreams = new HashMap<>();
-        this.replicaOutputStreams = new HashMap<>();
         this.datacenterIPs = Utils.getDatacenterIPs(index);
         this.replicasIPs = Utils.getReplicaIPs(index);
-        this.txnLocks = new HashMap<>();
-        this.ackLocks = new HashMap<>();
-        this.counter = new HashMap<>();
 
         openServerPort();
         openClientPort();
@@ -127,6 +122,8 @@ public class RCServer {
                 }
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Something went wrong in read-server-msg thread", e);
+            } finally {
+                Utils.closeQuietly(server);
             }
         };
 
@@ -184,7 +181,10 @@ public class RCServer {
         AddressConfig coordinator = msg.getCoordinator();
         ObjectOutputStream oos = datacenterOutputStreams.get(coordinator);
         ServerMsg ackMsg = new ServerMsg(Message.ACK_2PC_PREPARE, msg);
-        oos.writeObject(ackMsg);
+
+        synchronized (oos) {
+            oos.writeObject(ackMsg);
+        }
     }
 
     private void handleAck2PCPrepare(ServerMsg msg) throws Exception {
@@ -211,7 +211,9 @@ public class RCServer {
 
             // Send 2PC Commit to datacenter servers
             for (ObjectOutputStream oos : datacenterOutputStreams.values()) {
-                oos.writeObject(commitMsg);
+                synchronized (oos) {
+                    oos.writeObject(commitMsg);
+                }
             }
         }
 
@@ -291,7 +293,9 @@ public class RCServer {
             // Send 2PC PREPARE to all shards within datacenter
             ServerMsg _2PCPrepare = new ServerMsg(Message._2PC_PREPARE, serverMsg);
             for (ObjectOutputStream oos : datacenterOutputStreams.values()) {
-                oos.writeObject(_2PCPrepare);
+                synchronized (oos) {
+                    oos.writeObject(_2PCPrepare);
+                }
             }
 
             // Wait for ack 2PC from all datacenter servers
@@ -302,7 +306,9 @@ public class RCServer {
             outputStream.writeObject(value);
             ServerMsg ack2PCPrepare = new ServerMsg(Message._2PC_ACCEPT, serverMsg);
             for (ObjectOutputStream oos : replicaOutputStreams.values()) {
-                oos.writeObject(ack2PCPrepare);
+                synchronized (oos) {
+                    oos.writeObject(ack2PCPrepare);
+                }
             }
         }
     }
