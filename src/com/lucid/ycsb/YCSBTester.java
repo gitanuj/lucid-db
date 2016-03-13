@@ -16,14 +16,14 @@ public class YCSBTester {
     private static final List<Thread> THREADS = new ArrayList<>();
 
     public static void main(String[] args) {
-        testSpannerDb();
+        startTest();
     }
 
-    private static void testSpannerDb() {
+    private static void startTest() {
 
-        YCSBDB ycsbdb = new DummyDB();
+        YCSBDB ycsbdb = new RCDB();
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 1; i++) {
             final int id = i;
             Thread t = new Thread(() -> {
                 String table = "table";

@@ -176,8 +176,10 @@ public class RCClient implements YCSBClient {
             }
 
             // If majority threads have returned, notify readsWaitOnMe object.
-            if (readsReturned > readThreadsCounter / 2)
-                readsWaitOnMe.notify();
+            if (readsReturned > ((readThreadsCounter / 2) + 1))
+                synchronized (readsWaitOnMe){
+                    readsWaitOnMe.notify();
+                }
         }
     }
 
@@ -203,7 +205,7 @@ public class RCClient implements YCSBClient {
                 // Wait for response.
                 reader = new Scanner(socket.getInputStream());
                 result = reader.next();
-
+                LogUtils.debug(LOG_TAG, "Result for txn id " + writeTxnId + " is " + result);
                 socket.close();
 
                 // Report to WriteMajoritySelector object.
@@ -230,11 +232,14 @@ public class RCClient implements YCSBClient {
 
             // If majority threads have returned, set result and notify writesWaitOnMe object.
             if (writesReturned > writeThreadsCounter / 2) {
-                if (numberOfCommits > writeThreadsCounter / 2)
+                if (numberOfCommits > ((writeThreadsCounter / 2) + 1))
                     writeSuccessful = true;
                 LogUtils.debug(LOG_TAG, "Number of data centres where transaction ID " + writeTxnId + " committed " +
                         "are " + numberOfCommits);
-                writesWaitOnMe.notify();
+
+                synchronized (writesWaitOnMe){
+                    writesWaitOnMe.notify();
+                }
             }
         }
     }

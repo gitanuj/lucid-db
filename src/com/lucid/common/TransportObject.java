@@ -1,7 +1,5 @@
 package com.lucid.common;
 
-import com.lucid.common.AddressConfig;
-
 import java.io.Serializable;
 import java.util.Map;
 
