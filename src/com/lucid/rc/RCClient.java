@@ -187,8 +187,8 @@ public class RCClient implements YCSBClient {
         AddressConfig server;
         WriteCommand command;
         ObjectOutputStream writer;
-        Scanner reader;
-        String result;
+        ObjectInputStream reader;
+        Pair<Long, String> result;
 
         public CommandCluster(AddressConfig shard, WriteCommand command) {
             this.server = shard;
@@ -203,8 +203,8 @@ public class RCClient implements YCSBClient {
                 writer.writeObject(new TransportObject(command.getTxn_id(), command.getWriteCommands()));
 
                 // Wait for response.
-                reader = new Scanner(socket.getInputStream());
-                result = reader.next();
+                reader = new ObjectInputStream(socket.getInputStream());
+                result = (Pair<Long, String>)reader.readObject();
                 LogUtils.debug(LOG_TAG, "Result for txn id " + writeTxnId + " is " + result);
                 socket.close();
 
@@ -224,10 +224,10 @@ public class RCClient implements YCSBClient {
             numberOfCommits = 0;
         }
 
-        public synchronized void threadReturned(String result) {
+        public synchronized void threadReturned(Pair<Long, String> result) {
             writesReturned++;
 
-            if (result.startsWith("COMMIT"))
+            if (result.getSecond().startsWith("COMMIT"))
                 numberOfCommits++;
 
             // If majority threads have returned, set result and notify writesWaitOnMe object.
