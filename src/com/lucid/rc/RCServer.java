@@ -1,6 +1,5 @@
 package com.lucid.rc;
 
-import com.google.common.util.concurrent.Striped;
 import com.lucid.common.*;
 import com.lucid.rc.ServerMsg.Message;
 
@@ -17,7 +16,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
 
 public class RCServer {
 
@@ -43,13 +41,13 @@ public class RCServer {
 
     private final Map<AddressConfig, ObjectOutputStream> replicaOutputStreams;
 
-    private final Map<Long, List<Lock>> txnLocks;
+    private final Map<Long, List<Semaphore>> txnLocks;
 
     private final Map<Long, Semaphore> ackLocks;
 
     private final Map<Long, AtomicInteger> counter;
 
-    private final Striped<Lock> stripedLocks = Striped.lazyWeakLock(100);
+    private final StripedExclusiveSemaphore stripedSemaphore = new StripedExclusiveSemaphore(512);
 
     public RCServer(AddressConfig addressConfig, int index) {
         Lucid.getInstance().onServerStarted();
@@ -109,7 +107,7 @@ public class RCServer {
             try {
                 ServerSocket ss = new ServerSocket(serverPort);
                 while (true) {
-                    handleServerMsg(ss.accept());
+                    readServerMsg(ss.accept());
                 }
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Something went wrong in accept-server thread", e);
@@ -119,56 +117,62 @@ public class RCServer {
         Utils.startThreadWithName(runnable, "accept-server");
     }
 
-    private void handleServerMsg(Socket server) {
+    private void readServerMsg(Socket server) {
         Runnable runnable = () -> {
-            ObjectInputStream inputStream = null;
-
             try {
-                inputStream = new ObjectInputStream(server.getInputStream());
-                ServerMsg msg = (ServerMsg) inputStream.readObject();
-                handleServerMsg(msg);
+                ObjectInputStream inputStream = new ObjectInputStream(server.getInputStream());
+                while (true) {
+                    ServerMsg msg = (ServerMsg) inputStream.readObject();
+                    handleServerMsg(msg);
+                }
             } catch (Exception e) {
-                LogUtils.error(LOG_TAG, "Something went wrong in handle-server thread", e);
-            } finally {
-                Utils.closeQuietly(inputStream);
+                LogUtils.error(LOG_TAG, "Something went wrong in read-server-msg thread", e);
             }
         };
 
-        Utils.startThreadWithName(runnable, "handle-server");
+        Utils.startThreadWithName(runnable, "read-server-msg");
     }
 
-    private void handleServerMsg(ServerMsg msg) throws Exception {
-        LogUtils.debug(LOG_TAG, "Handling server msg: " + msg);
+    private void handleServerMsg(ServerMsg msg) {
+        Runnable runnable = () -> {
+            LogUtils.debug(LOG_TAG, "Handling server msg: " + msg);
 
-        switch (msg.getMessage()) {
-            case _2PC_PREPARE:
-                handle2PCPrepare(msg);
-                break;
-            case ACK_2PC_PREPARE:
-                handleAck2PCPrepare(msg);
-                break;
-            case _2PC_ACCEPT:
-                handle2PCAccept(msg);
-                break;
-            case _2PC_COMMIT:
-                handle2PCCommit(msg);
-                break;
-        }
+            try {
+                switch (msg.getMessage()) {
+                    case _2PC_PREPARE:
+                        handle2PCPrepare(msg);
+                        break;
+                    case ACK_2PC_PREPARE:
+                        handleAck2PCPrepare(msg);
+                        break;
+                    case _2PC_ACCEPT:
+                        handle2PCAccept(msg);
+                        break;
+                    case _2PC_COMMIT:
+                        handle2PCCommit(msg);
+                        break;
+                }
+            } catch (Exception e) {
+                LogUtils.error(LOG_TAG, "Something went wrong in handle-server-msg thread", e);
+            }
+        };
+
+        Utils.startThreadWithName(runnable, "handle-server-msg");
     }
 
     private void acquireTxnLocks(ServerMsg msg) throws Exception {
-        List<Lock> lockList = new ArrayList<>();
+        List<Semaphore> lockList = new ArrayList<>();
         txnLocks.put(msg.getTxn_id(), lockList);
         for (String key : msg.getMap().keySet()) {
-            Lock lock = stripedLocks.get(key);
-            lock.lock();
-            lockList.add(lock);
+            Semaphore semaphore = stripedSemaphore.get(key);
+            semaphore.acquire();
+            lockList.add(semaphore);
         }
     }
 
     private void releaseTxnLocks(ServerMsg msg) throws Exception {
-        for (Lock lock : txnLocks.remove(msg.getTxn_id())) {
-            lock.unlock();
+        for (Semaphore semaphore : txnLocks.remove(msg.getTxn_id())) {
+            semaphore.release();
         }
     }
 
