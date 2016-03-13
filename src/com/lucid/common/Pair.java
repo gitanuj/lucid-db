@@ -28,4 +28,12 @@ public class Pair<U, V> implements Serializable {
     public void setSecond(V second) {
         this.second = second;
     }
+
+    @Override
+    public String toString() {
+        return "Pair{" +
+                "first=" + first +
+                ", second=" + second +
+                '}';
+    }
 }
