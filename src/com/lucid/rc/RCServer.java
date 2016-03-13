@@ -292,7 +292,7 @@ public class RCServer {
             ackLocks.get(msg.getTxn_id()).acquire(datacenterOutputStreams.size());
 
             // Inform replicas and client
-            outputStream.writeObject("COMMIT:" + msg.getTxn_id());
+            outputStream.writeBytes("COMMIT:" + msg.getTxn_id());
             ServerMsg ack2PCPrepare = new ServerMsg(Message.ACK_2PC_PREPARE, serverMsg);
             for (ObjectOutputStream oos : replicaOutputStreams.values()) {
                 oos.writeObject(ack2PCPrepare);
