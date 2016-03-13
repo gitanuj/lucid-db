@@ -1,30 +1,39 @@
 package com.lucid.common;
 
-import com.lucid.common.AddressConfig;
+import com.google.gson.Gson;
 
-import java.util.*;
+import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class Config {
+
+    private static final String LOG_TAG = "CONFIG";
 
     private Config() {
     }
 
-    public static final int NUM_CLUSTERS = 3;
-    public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
     public static final long TXN_ID_NOT_APPLICABLE = -1;
+    public static int NUM_CLUSTERS;
+    public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
+    public static long READ_QUERY_TIMEOUT;
+    public static long COMMAND_TIMEOUT;
 
     // SERVER_IPS list structure - contiguous blocks of shard replicas.
     static {
-        String host = "127.0.0.1";
 
-        SERVER_IPS.add(new AddressConfig(host, 9000, 9100, 9200));
-        SERVER_IPS.add(new AddressConfig(host, 9001, 9101, 9201));
-        SERVER_IPS.add(new AddressConfig(host, 9002, 9102, 9202));
-        SERVER_IPS.add(new AddressConfig(host, 9003, 9103, 9203));
-        SERVER_IPS.add(new AddressConfig(host, 9004, 9104, 9204));
-        SERVER_IPS.add(new AddressConfig(host, 9005, 9105, 9205));
+        try {
+            Properties properties = new Gson().fromJson(new FileReader("lucid.config"), Properties.class);
+            for (AddressConfig addressConfig : properties.getAddressConfigs()) {
+                SERVER_IPS.add(addressConfig);
+            }
+
+            NUM_CLUSTERS = properties.getNumClusters();
+            READ_QUERY_TIMEOUT = properties.getReadQueryTimeout();
+            COMMAND_TIMEOUT = properties.getCommandTimeout();
+
+        } catch (Exception e) {
+            LogUtils.error(LOG_TAG, "Failed to load config", e);
+        }
     }
-
-    public static final long READ_QUERY_TIMEOUT = 10 * 1000;
-    public static final long COMMAND_TIMEOUT = 5 * 1000;
 }
