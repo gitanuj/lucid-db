@@ -21,9 +21,9 @@ public class YCSBTester {
 
     private static void startTest() {
 
-        YCSBDB ycsbdb = new RCDB();
+        YCSBDB ycsbdb = new SpannerDB();
 
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 1000; i++) {
             final int id = i;
             Thread t = new Thread(() -> {
                 String table = "table";
