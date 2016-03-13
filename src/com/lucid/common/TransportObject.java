@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * The commit message object: objects of this class will be serialised and sent from client to server.
  */
-public class TransportObject implements Serializable{
+public class TransportObject implements Serializable {
     private long txn_id;
     private Map<String, String> writeMap;
     private AddressConfig coordinator;
@@ -15,17 +15,17 @@ public class TransportObject implements Serializable{
 
     private boolean isCoordinator;
 
-    public TransportObject(long id, Map<String, String> map){
+    public TransportObject(long id, Map<String, String> map) {
         this.txn_id = id;
         writeMap = map;
     }
 
-    public TransportObject(long id, String key){
+    public TransportObject(long id, String key) {
         this.txn_id = id;
         this.key = key;
     }
 
-    public TransportObject(AddressConfig coord, long id, Map<String, String> map, int num, boolean isC){
+    public TransportObject(AddressConfig coord, long id, Map<String, String> map, int num, boolean isC) {
         this.txn_id = id;
         writeMap = map;
         this.coordinator = coord;
@@ -81,5 +81,15 @@ public class TransportObject implements Serializable{
         this.coordinator = coordinator;
     }
 
-
+    @Override
+    public String toString() {
+        return "TransportObject{" +
+                "txn_id=" + txn_id +
+                ", writeMap=" + writeMap +
+                ", coordinator=" + coordinator +
+                ", number_of_leaders=" + number_of_leaders +
+                ", key='" + key + '\'' +
+                ", isCoordinator=" + isCoordinator +
+                '}';
+    }
 }

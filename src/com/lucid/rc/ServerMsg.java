@@ -52,4 +52,15 @@ class ServerMsg implements Serializable {
     public AddressConfig getCoordinator() {
         return coordinator;
     }
+
+    @Override
+    public String toString() {
+        return "ServerMsg{" +
+                "txn_id=" + txn_id +
+                ", message=" + message +
+                ", key='" + key + '\'' +
+                ", map=" + map +
+                ", coordinator=" + coordinator +
+                '}';
+    }
 }

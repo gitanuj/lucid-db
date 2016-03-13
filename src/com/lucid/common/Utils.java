@@ -51,4 +51,10 @@ public class Utils {
         }
         return list;
     }
+
+    public static List<AddressConfig> getReplicaIPs(int index) {
+        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
+        int position = index / clusterSize;
+        return Config.SERVER_IPS.subList(position * clusterSize, position * clusterSize + clusterSize);
+    }
 }

@@ -64,7 +64,7 @@ public class RCServer {
         this.datacenterOutputStreams = new HashMap<>();
         this.replicaOutputStreams = new HashMap<>();
         this.datacenterIPs = Utils.getDatacenterIPs(index);
-        this.replicasIPs = Utils.getReplicaClusterIPs(index % Config.NUM_CLUSTERS);
+        this.replicasIPs = Utils.getReplicaIPs(index);
         this.txnLocks = new HashMap<>();
         this.ackLocks = new HashMap<>();
         this.counter = new HashMap<>();
@@ -138,6 +138,8 @@ public class RCServer {
     }
 
     private void handleServerMsg(ServerMsg msg) throws Exception {
+        LogUtils.debug(LOG_TAG, "Handling server msg: " + msg);
+
         switch (msg.getMessage()) {
             case _2PC_PREPARE:
                 handle2PCPrepare(msg);
@@ -242,8 +244,6 @@ public class RCServer {
 
     private void handleClientMsg(Socket client) {
         Runnable runnable = () -> {
-            LogUtils.debug(LOG_TAG, "Handling client msg");
-
             ObjectInputStream inputStream = null;
             ObjectOutputStream outputStream = null;
             TransportObject msg = null;
@@ -274,6 +274,8 @@ public class RCServer {
     }
 
     private void handleClientMsg(TransportObject msg, ObjectOutputStream outputStream) throws Exception {
+        LogUtils.debug(LOG_TAG, "Handling client msg: " + msg);
+
         if (msg.getKey() != null) {
             // Read query
             Pair<Long, String> value = stateMachine.read(msg.getKey());
@@ -294,7 +296,7 @@ public class RCServer {
             // Inform replicas and client
             Pair<Long, String> value = new Pair<>(msg.getTxn_id(), "COMMIT");
             outputStream.writeObject(value);
-            ServerMsg ack2PCPrepare = new ServerMsg(Message.ACK_2PC_PREPARE, serverMsg);
+            ServerMsg ack2PCPrepare = new ServerMsg(Message._2PC_ACCEPT, serverMsg);
             for (ObjectOutputStream oos : replicaOutputStreams.values()) {
                 oos.writeObject(ack2PCPrepare);
             }

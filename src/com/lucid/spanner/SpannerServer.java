@@ -77,7 +77,7 @@ public class SpannerServer {
     private void startPaxosCluster() {
         Address selfPaxosAddress = new Address(host, paxosPort);
 
-        paxosMembers = SpannerUtils.getPaxosClusterAll(index);
+        paxosMembers = Utils.getReplicaIPs(index);
         LogUtils.debug(LOG_TAG, "Starting SpannerServer at:" + host + " with members:" + paxosMembers);
 
         CopycatServer server = CopycatServer.builder(selfPaxosAddress, SpannerUtils.toAddress(paxosMembers))
