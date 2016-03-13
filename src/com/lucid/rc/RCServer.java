@@ -3,7 +3,9 @@ package com.lucid.rc;
 import com.google.common.util.concurrent.Striped;
 import com.lucid.common.*;
 
-import java.io.*;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -243,12 +245,12 @@ public class RCServer {
             LogUtils.debug(LOG_TAG, "Handling client msg");
 
             ObjectInputStream inputStream = null;
-            OutputStream outputStream = null;
+            ObjectOutputStream outputStream = null;
             TransportObject msg = null;
 
             try {
                 inputStream = new ObjectInputStream(client.getInputStream());
-                outputStream = client.getOutputStream();
+                outputStream = new ObjectOutputStream(client.getOutputStream());
                 msg = (TransportObject) inputStream.readObject();
 
                 // Create semaphore
@@ -271,11 +273,11 @@ public class RCServer {
         Utils.startThreadWithName(runnable, "handle-client");
     }
 
-    private void handleClientMsg(TransportObject msg, OutputStream outputStream) throws Exception {
+    private void handleClientMsg(TransportObject msg, ObjectOutputStream outputStream) throws Exception {
         if (msg.getKey() != null) {
             // Read query
             Pair<Long, String> value = stateMachine.read(msg.getKey());
-            new ObjectOutputStream(outputStream).writeObject(value);
+            outputStream.writeObject(value);
         } else {
             // Write command
             ServerMsg serverMsg = new ServerMsg(null, msg.getKey(), msg.getWriteMap(), msg.getTxn_id(), addressConfig);
@@ -290,7 +292,8 @@ public class RCServer {
             ackLocks.get(msg.getTxn_id()).acquire(datacenterOutputStreams.size());
 
             // Inform replicas and client
-            new PrintWriter(outputStream).print("COMMIT:" + msg.getTxn_id());
+            Pair<Long, String> value = new Pair<>(msg.getTxn_id(), "COMMIT");
+            outputStream.writeObject(value);
             ServerMsg ack2PCPrepare = new ServerMsg(Message.ACK_2PC_PREPARE, serverMsg);
             for (ObjectOutputStream oos : replicaOutputStreams.values()) {
                 oos.writeObject(ack2PCPrepare);
