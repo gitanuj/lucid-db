@@ -161,9 +161,11 @@ public class RCServer {
         List<Semaphore> lockList = new ArrayList<>();
         txnLocks.put(msg.getTxn_id(), lockList);
         for (String key : msg.getMap().keySet()) {
-            Semaphore semaphore = stripedSemaphore.get(key);
-            semaphore.acquire();
-            lockList.add(semaphore);
+            if (serverContainsKey(addressConfig, key)) {
+                Semaphore semaphore = stripedSemaphore.get(key);
+                semaphore.acquire();
+                lockList.add(semaphore);
+            }
         }
     }
 
@@ -173,6 +175,7 @@ public class RCServer {
         }
     }
 
+    // Received by all the servers
     private void handle2PCPrepare(ServerMsg msg) throws Exception {
         // Take locks
         acquireTxnLocks(msg);
@@ -180,18 +183,20 @@ public class RCServer {
         // Send 2PC ack to coordinator
         AddressConfig coordinator = msg.getCoordinator();
         ObjectOutputStream oos = datacenterOutputStreams.get(coordinator);
-        ServerMsg ackMsg = new ServerMsg(Message.ACK_2PC_PREPARE, msg);
+        ServerMsg ackMsg = new ServerMsg(msg, Message.ACK_2PC_PREPARE);
 
         synchronized (oos) {
             oos.writeObject(ackMsg);
         }
     }
 
+    // Only received by a coordinator
     private void handleAck2PCPrepare(ServerMsg msg) throws Exception {
         // Let the coordinator know that ack is received
         ackLocks.get(msg.getTxn_id()).release();
     }
 
+    // Only received by a coordinator
     private void handle2PCAccept(ServerMsg msg) throws Exception {
         // Create counter
         AtomicInteger atomicCounter;
@@ -207,10 +212,12 @@ public class RCServer {
         int count = atomicCounter.incrementAndGet();
         if (count == total / 2 + 1) {
             // Majority reached
-            ServerMsg commitMsg = new ServerMsg(Message._2PC_COMMIT, msg);
+            ServerMsg commitMsg = new ServerMsg(msg, Message._2PC_COMMIT);
 
             // Send 2PC Commit to datacenter servers
-            for (ObjectOutputStream oos : datacenterOutputStreams.values()) {
+            List<AddressConfig> datacenterIPs = getDatacenterIPsFor(msg.getMap());
+            for (AddressConfig config : datacenterIPs) {
+                ObjectOutputStream oos = datacenterOutputStreams.get(config);
                 synchronized (oos) {
                     oos.writeObject(commitMsg);
                 }
@@ -225,9 +232,10 @@ public class RCServer {
         }
     }
 
+    // Received by all the servers
     private void handle2PCCommit(ServerMsg msg) throws Exception {
         // Commit values
-        stateMachine.write(msg.getTxn_id(), msg.getMap());
+        stateMachine.write(msg.getTxn_id(), createMyWriteMap(msg.getMap()));
 
         // Release txn locks
         releaseTxnLocks(msg);
@@ -290,21 +298,25 @@ public class RCServer {
             // Write command
             ServerMsg serverMsg = new ServerMsg(null, msg.getKey(), msg.getWriteMap(), msg.getTxn_id(), addressConfig);
 
-            // Send 2PC PREPARE to all shards within datacenter
-            ServerMsg _2PCPrepare = new ServerMsg(Message._2PC_PREPARE, serverMsg);
-            for (ObjectOutputStream oos : datacenterOutputStreams.values()) {
+            // Send 2PC PREPARE to shards within datacenter
+            ServerMsg _2PCPrepare = new ServerMsg(serverMsg, Message._2PC_PREPARE);
+            List<AddressConfig> datacenterIPs = getDatacenterIPsFor(msg.getWriteMap());
+            for (AddressConfig config : datacenterIPs) {
+                ObjectOutputStream oos = datacenterOutputStreams.get(config);
                 synchronized (oos) {
                     oos.writeObject(_2PCPrepare);
                 }
             }
 
-            // Wait for ack 2PC from all datacenter servers
-            ackLocks.get(msg.getTxn_id()).acquire(datacenterOutputStreams.size());
+            // Wait for ack 2PC from datacenter servers
+            ackLocks.get(msg.getTxn_id()).acquire(datacenterIPs.size());
 
-            // Inform replicas and client
+            // Inform client
             Pair<Long, String> value = new Pair<>(msg.getTxn_id(), "COMMIT");
             outputStream.writeObject(value);
-            ServerMsg ack2PCPrepare = new ServerMsg(Message._2PC_ACCEPT, serverMsg);
+
+            // Inform other coordinators
+            ServerMsg ack2PCPrepare = new ServerMsg(serverMsg, Message._2PC_ACCEPT);
             for (ObjectOutputStream oos : replicaOutputStreams.values()) {
                 synchronized (oos) {
                     oos.writeObject(ack2PCPrepare);
@@ -313,9 +325,31 @@ public class RCServer {
         }
     }
 
-    private Map<String, String> createShardMap(Map<String, String> map) {
-        // TODO
-        return null;
+    private List<AddressConfig> getDatacenterIPsFor(Map<String, String> writeMap) {
+        List<AddressConfig> ips = new ArrayList<>();
+        for (String key : writeMap.keySet()) {
+            for (AddressConfig config : datacenterIPs) {
+                if (serverContainsKey(config, key)) {
+                    ips.add(config);
+                }
+            }
+        }
+        return ips;
+    }
+
+    private boolean serverContainsKey(AddressConfig config, String key) {
+        List<AddressConfig> ips = Utils.getReplicaClusterIPs(key);
+        return ips.contains(config);
+    }
+
+    private Map<String, String> createMyWriteMap(Map<String, String> writeMap) {
+        Map<String, String> map = new HashMap<>();
+        for (String key : writeMap.keySet()) {
+            if (serverContainsKey(addressConfig, key)) {
+                map.put(key, writeMap.get(key));
+            }
+        }
+        return map;
     }
 
     private class ConnectToDatacenterRunnable implements Runnable {

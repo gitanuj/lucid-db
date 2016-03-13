@@ -21,7 +21,7 @@ class ServerMsg implements Serializable {
 
     private AddressConfig coordinator;
 
-    public ServerMsg(Message message, ServerMsg serverMsg) {
+    public ServerMsg(ServerMsg serverMsg, Message message) {
         this(message, serverMsg.getKey(), serverMsg.getMap(), serverMsg.getTxn_id(), serverMsg.getCoordinator());
     }
 
