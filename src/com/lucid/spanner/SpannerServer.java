@@ -10,10 +10,7 @@ import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 import io.atomix.copycat.server.storage.StorageLevel;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
@@ -39,6 +36,7 @@ public class SpannerServer {
     volatile private CopycatServer.State role;
 
     List<AddressConfig> paxosMembers;
+    Map<Long, List<Integer>> leaders;  // Txn Id -> List of index of leaders in Config
 
     private TwoPC twoPC;
 
@@ -57,6 +55,7 @@ public class SpannerServer {
 
         twoPC = new TwoPC();
         paxosMembers = new ArrayList<>();
+        leaders = new HashMap<>();
         LogUtils.debug(LOG_TAG, "Initialing SpannerServer with host:" + host +
                 " paxosPort:" + paxosPort + " serverPort:" + serverPort + " clientPort:" + clientPort);
 
@@ -87,12 +86,9 @@ public class SpannerServer {
                         withDirectory(String.valueOf(paxosPort)).build())
                 .build();
 
-        server.onStateChange(new Consumer<CopycatServer.State>() {
-            @Override
-            public void accept(CopycatServer.State state) {
-                role = state;
-                LogUtils.debug(LOG_TAG, "State updated: " + role.name());
-            }
+        server.onStateChange((CopycatServer.State state) -> {
+            role = state;
+            LogUtils.debug(LOG_TAG, "State updated: " + role.name());
         });
         server.serializer().disableWhitelist();
 
@@ -101,21 +97,18 @@ public class SpannerServer {
     }
 
     private void acceptServers() {
-        Runnable serverRunnable = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    ServerSocket serverSocket = new ServerSocket(serverPort);
-                    LogUtils.debug(LOG_TAG, "Starting serverSocket at server port");
-                    while (true) {
-                        Socket cohort = serverSocket.accept();
-                        LogUtils.debug(LOG_TAG, "Received msg at ServerPort from:" +
-                                cohort.getInetAddress() + cohort.getPort());
-                        handleServerAccept(cohort);
-                    }
-                } catch (Exception e) {
-                    LogUtils.error(LOG_TAG, "Exception in acceptServer thread.", e);
+        Runnable serverRunnable = () -> {
+            try {
+                ServerSocket serverSocket = new ServerSocket(serverPort);
+                LogUtils.debug(LOG_TAG, "Starting serverSocket at server port");
+                while (true) {
+                    Socket cohort = serverSocket.accept();
+                    LogUtils.debug(LOG_TAG, "Received msg at ServerPort from:" +
+                            cohort.getInetAddress() + cohort.getPort());
+                    handleServerAccept(cohort);
                 }
+            } catch (Exception e) {
+                LogUtils.error(LOG_TAG, "Exception in acceptServer thread.", e);
             }
         };
         Utils.startThreadWithName(serverRunnable, "ServerAccept Thread at Server " + host + ":" + serverPort);
@@ -141,6 +134,7 @@ public class SpannerServer {
 
         SpannerUtils.SERVER_MSG msgType;
         long tid;
+        int serverIndex;
 
         if (inputLine.startsWith("PREPARE_ACK")) {
             msgType = SpannerUtils.SERVER_MSG.PREPARE_ACK;
@@ -161,15 +155,21 @@ public class SpannerServer {
         }
 
         String[] msg = inputLine.split(":");
-        tid = Integer.parseInt(msg[1]);
+        tid = Long.parseLong(msg[1]);
+        serverIndex = Integer.parseInt(msg[2]);
         LogUtils.debug(LOG_TAG, "Received 2PC msg of type:" + msgType + " for TxnID:" + tid);
 
         switch (msgType) {
             case PREPARE_ACK:
                 if (!iAmCoordinator(tid)) {
-                    LogUtils.error(LOG_TAG, "PrepareAck recd at non-coordinator from server " + cohort.getInetAddress
-                            ().getHostName() + cohort.getPort());
+                    LogUtils.debug(LOG_TAG, "PrepareAck recd for future txn from server " + cohort.getInetAddress
+                            ().getHostName() + ":" + cohort.getPort());
                 }
+                if (!leaders.containsKey(tid)) {
+                    leaders.put(tid, new ArrayList<>());
+                }
+                leaders.get(tid).add(serverIndex);
+
                 twoPC.recvPrepareAck(tid);
 
                 break;
@@ -189,9 +189,15 @@ public class SpannerServer {
 
             case PREPARE_NACK:
                 if (!iAmCoordinator(tid)) {
-                    LogUtils.error(LOG_TAG, "PrepareNack recd at non-coordinator");
+                    LogUtils.debug(LOG_TAG, "PrepareNack recd for FutureTxn.");
                 }
-                twoPC.recvPrepareAck(tid);
+                if (!leaders.containsKey(tid)) {
+                    leaders.put(tid, new ArrayList<>());
+                }
+                leaders.get(tid).add(serverIndex);
+
+                twoPC.recvPrepareNack(tid);
+
                 break;
 
             case ABORT:
@@ -213,18 +219,15 @@ public class SpannerServer {
     }
 
     private void acceptClients() {
-        Runnable clientRunnable = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    ServerSocket serverSocket = new ServerSocket(clientPort);
-                    while (true) {
-                        Socket client = serverSocket.accept();
-                        handleClientAccept(client);
-                    }
-                } catch (Exception e) {
-                    LogUtils.error(LOG_TAG, "Exception in accept Client thread.", e);
+        Runnable clientRunnable = () -> {
+            try {
+                ServerSocket serverSocket = new ServerSocket(clientPort);
+                while (true) {
+                    Socket client = serverSocket.accept();
+                    handleClientAccept(client);
                 }
+            } catch (Exception e) {
+                LogUtils.error(LOG_TAG, "Exception in accept Client thread.", e);
             }
         };
         Utils.startThreadWithName(clientRunnable, "ClientAccept Thread at Server " + host + ":" + clientPort);
@@ -232,86 +235,84 @@ public class SpannerServer {
     }
 
     private void handleClientAccept(Socket client) {
-        Runnable clientRunnable = new Runnable() {
-            @Override
-            public void run() {
-                long tid = 0;
-                int nShards = 0;
+        Runnable clientRunnable = () -> {
+            long tid = 0;
+            int nShards = 0;
+            TransportObject transportObject = null;
+            try {
+                LogUtils.debug(LOG_TAG, "Client connected:" + client.getInetAddress() + ":" + client.getPort());
+                // Send my role to the client
+                PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+                out.println(iAmLeader() ? "1" : "0");
+
+                // If I am not leader, close connection, cleanup and exit.
+                if (!iAmLeader()) {
+                    LogUtils.debug(LOG_TAG, "Sent client msg that I am not leader. Closing connection.");
+                    com.lucid.common.Utils.closeQuietly(client);
+                    return;
+                }
+
+                // Get de-serialized TransportObject from client
+                //BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+                //String inputLine = in.readLine();
+
+                ObjectInputStream objStream = new ObjectInputStream(client.getInputStream());
                 try {
-                    LogUtils.debug(LOG_TAG, "Client connected:" + client.getInetAddress() + ":" + client.getPort());
-                    // Send my role to the client
-                    PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-                    out.println(iAmLeader() ? "1" : "0");
-
-                    // If I am not leader, close connection, cleanup and exit.
-                    if (!iAmLeader()) {
-                        LogUtils.debug(LOG_TAG, "Sent client msg that I am not leader. Closing connection.");
-                        com.lucid.common.Utils.closeQuietly(client);
-                        return;
+                    transportObject = (TransportObject) objStream.readObject();
+                    if (transportObject == null) {
+                        LogUtils.error(LOG_TAG, "Received Null TransportObject from:" + client.getInetAddress());
+                        throw new NullPointerException();
                     }
+                } catch (ClassNotFoundException e) {
+                    LogUtils.error(LOG_TAG, "Recd something other than TransportObject", e);
+                } catch (NullPointerException e) {
+                    LogUtils.error(LOG_TAG, "De-serialized Transport object is null.", e);
+                }
 
-                    // Get de-serialized TransportObject from client
-                    //BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-                    //String inputLine = in.readLine();
+                tid = transportObject.getTxn_id();
+                Map<String, String> writeMap = transportObject.getWriteMap();
+                LogUtils.debug(LOG_TAG, "Received writeMap for Txn ID:" + tid + " map:" + writeMap);
 
-                    ObjectInputStream objStream = new ObjectInputStream(client.getInputStream());
-                    TransportObject transportObject = null;
-                    try {
-                        transportObject = (TransportObject) objStream.readObject();
-                        if (transportObject == null) {
-                            LogUtils.error(LOG_TAG, "Received Null TransportObject from:" + client.getInetAddress());
-                            throw new NullPointerException();
-                        }
-                    } catch (ClassNotFoundException e) {
-                        LogUtils.error(LOG_TAG, "Recd something other than TransportObject", e);
-                    } catch (NullPointerException e) {
-                        LogUtils.error(LOG_TAG, "De-serialized Transport object is null.", e);
-                    }
+                // Try to obtain locks (blocking)
+                obtainLocks(tid, writeMap.keySet());
 
-                    tid = transportObject.getTxn_id();
-                    Map<String, String> writeMap = transportObject.getWriteMap();
-                    LogUtils.debug(LOG_TAG, "Received writeMap for Txn ID:" + tid + " map:" + writeMap);
+                // Replicate PrepareCommitCommand using Paxos.
+                PrepareCommitCommand prepCommand = new PrepareCommitCommand(writeMap);
+                LogUtils.debug(LOG_TAG, "Replicating PrepareCommitCommand for tid: " + tid);
+                paxosReplicate(prepCommand);
 
-                    // Try to obtain locks (blocking)
-                    obtainLocks(tid, writeMap.keySet());
-
-                    // Replicate PrepareCommitCommand using Paxos.
-                    PrepareCommitCommand prepCommand = new PrepareCommitCommand(writeMap);
-                    LogUtils.debug(LOG_TAG, "Replicating PrepareCommitCommand for tid: " + tid);
-                    paxosReplicate(prepCommand);
-
-                    // If I am coordinator, wait till all are prepared.
-                    if (transportObject.isCoordinator()) {
-                        LogUtils.debug(LOG_TAG, "At Coordinator. Finished Replicating. Waiting for Prepare(N)ACKs.");
-                        // Determine number of shards involved
-                        nShards = transportObject.getNumber_of_leaders() - 1;
-                        twoPC.addNewTxn(tid, nShards);
-                        twoPC.waitForPrepareAcks(tid);
-                        Address clientAddr = new Address(client.getInetAddress().getHostName(), client.getPort());
-                        if (twoPC.canCommit(tid)) {
-                            handleAllPrepareAcks(tid, client);
-                        } else {
-                            handlePrepareNack(tid, client);
-                        }
+                // If I am coordinator, wait till all are prepared.
+                if (transportObject.isCoordinator()) {
+                    LogUtils.debug(LOG_TAG, "At Coordinator. Finished Replicating. Waiting for Prepare(N)ACKs.");
+                    // Determine number of shards involved
+                    nShards = transportObject.getNumber_of_leaders() - 1;
+                    twoPC.addNewTxn(tid, nShards);
+                    twoPC.waitForPrepareAcks(tid);
+                    Address clientAddr = new Address(client.getInetAddress().getHostName(), client.getPort());
+                    if (twoPC.canCommit(tid)) {
+                        handleAllPrepareAcks(tid, client);
                     } else {
-                        LogUtils.debug(LOG_TAG, "At Leader: Sending prepare ACK/NACK to co-ordinator.");
-                        // Get coordinator IP from request and send PREPARE_ACK / PREPARENACK
-                        AddressConfig coordPaxosAddr = (AddressConfig) transportObject.getCoordinator();
-                        // Get corresponding server port
-                        Address coordServerAddr = new Address(coordPaxosAddr.host(), coordPaxosAddr.getServerPort());
-                        send2PCMsgSingle(SpannerUtils.SERVER_MSG.PREPARE_ACK, tid, coordServerAddr);
+                        handlePrepareNack(tid, client);
                     }
+                } else {
+                    LogUtils.debug(LOG_TAG, "At Leader: Sending prepare ACK/NACK to co-ordinator.");
+                    // Get coordinator IP from request and send PREPARE_ACK / PREPARENACK
+                    AddressConfig coordPaxosAddr = (AddressConfig) transportObject.getCoordinator();
+                    // Get corresponding server port
+                    String msg = SpannerUtils.SERVER_MSG.PREPARE_ACK.toString() + ":" + tid + ":" + index;
+                    send2PCMsgSingle(msg, coordPaxosAddr.host(), coordPaxosAddr.getServerPort());
+                }
 
-                } catch (Exception e) {
-                    LogUtils.error(LOG_TAG, "Error during 2PC handling.", e);
-                } finally {
+            } catch (Exception e) {
+                LogUtils.error(LOG_TAG, "Error during 2PC handling.", e);
+            } finally {
+                if (transportObject.isCoordinator())
                     tryReleaseLocks(tid);
-                    if (client != null) {
-                        try {
-                            client.close();
-                        } catch (Exception e) {
-                            LogUtils.error(LOG_TAG, "Exception while closing client.", e);
-                        }
+                if (client != null) {
+                    try {
+                        client.close();
+                    } catch (Exception e) {
+                        LogUtils.error(LOG_TAG, "Exception while closing client.", e);
                     }
                 }
             }
@@ -334,13 +335,15 @@ public class SpannerServer {
 
         LogUtils.debug(LOG_TAG, "Sending 2PC COMMIT message to client and other leaders.");
         // send COMMIT to client
-        send2PCMsgSingle(SpannerUtils.SERVER_MSG.COMMIT, tid, client);
+        String msg = SpannerUtils.SERVER_MSG.COMMIT.toString() + ":" + tid;
+        send2PCMsgSingle(msg, client);
 
         // Send 2PC commit to other leaders.
-        send2PCMsg(SpannerUtils.SERVER_MSG.COMMIT, tid, null);
+        send2PCMsgLeaders(SpannerUtils.SERVER_MSG.COMMIT, tid, leaders.get(tid));
 
         // Remove transaction from list of active txns
         twoPC.removeTxn(tid);
+        leaders.remove(tid);
     }
 
 
@@ -357,13 +360,15 @@ public class SpannerServer {
 
         LogUtils.debug(LOG_TAG, "Sending 2PC ABORTs to client and other leaders.");
         // send COMMIT to client
-        send2PCMsgSingle(SpannerUtils.SERVER_MSG.ABORT, tid, client);
+        String msg = SpannerUtils.SERVER_MSG.ABORT.toString() + ":" + tid;
+        send2PCMsgSingle(msg, client);
 
         // Send 2PC abort to other leaders.
-        send2PCMsg(SpannerUtils.SERVER_MSG.ABORT, tid, null);
+        send2PCMsgLeaders(SpannerUtils.SERVER_MSG.ABORT, tid, leaders.get(tid));
 
         // Remove transaction from list of active txns
         twoPC.removeTxn(tid);
+        leaders.remove(tid);
     }
 
     private boolean iAmLeader() {
@@ -385,48 +390,67 @@ public class SpannerServer {
         }
     }
 
-    private void send2PCMsg(SpannerUtils.SERVER_MSG msgType, long tid, List<AddressConfig> recipients) {
+    private void send2PCMsgLeaders(SpannerUtils.SERVER_MSG msgType, long tid, List<Integer> indexList) {
         // Send to all Leaders
-        if (recipients == null) {
-            for (Address addr : SpannerUtils.toAddress(paxosMembers)) {
-                send2PCMsgSingle(msgType, tid, addr);
-            }
-
-        } else {
-            // Send to given list
-            for (Address addr : SpannerUtils.toAddress(paxosMembers)) {
-                send2PCMsgSingle(msgType, tid, addr);
+        for (int index : indexList) {
+            String msg = msgType.toString() + ":" + tid + ":" + index;
+            AddressConfig addr = Config.SERVER_IPS.get(index);
+            try {
+                send2PCMsgSingle(msg, addr.host(), addr.getServerPort());
+            } catch (Exception e) {
+                LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
             }
         }
     }
 
-    private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Address client) {
-        String msg = msgType.toString() + ":" + tid;
+
+    private void send2PCMsgSingle(String msg, String host, int port) {
+        //String msg = msgType.toString() + ":" + tid;
+        Socket socket = null;
         try {
-            Socket socket = new Socket(client.host(), client.port());
+            socket = new Socket(host, port);
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             out.println(msg);
-            LogUtils.debug(LOG_TAG, "Sent 2PC Message to " + client.host());
-            socket.close();
+            LogUtils.debug(LOG_TAG, "Sent 2PC Message " + msg + " to " +
+                    socket.getInetAddress().getHostName() + ":" + socket.getPort());
+        } catch (Exception e) {
+            LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
+        } finally {
+            if (socket != null) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private void send2PCMsgSingle(String msg, Socket socket) {
+        //String msg = msgType.toString() + ":" + tid;
+        try {
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            out.println(msg);
+            LogUtils.debug(LOG_TAG, "Sent 2PC Message " + msg + " to " +
+                    socket.getInetAddress().getHostName() + ":" + socket.getPort());
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
         }
     }
 
-    private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Socket socket) {
-        if (socket == null) {
-            LogUtils.error(LOG_TAG, "Socket object is NULL.");
-            throw new NullPointerException();
-        }
-        String msg = msgType.toString() + ":" + tid;
-        try {
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            out.println(msg);
-            //socket.close();
-        } catch (Exception e) {
-            LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
-        }
-    }
+//    private void send2PCMsgSingle(SpannerUtils.SERVER_MSG msgType, long tid, Socket socket) {
+//        if (socket == null) {
+//            LogUtils.error(LOG_TAG, "Socket object is NULL.");
+//            throw new NullPointerException();
+//        }
+//        String msg = msgType.toString() + ":" + tid;
+//        try {
+//            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+//            out.println(msg);
+//        } catch (Exception e) {
+//            LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
+//        }
+//    }
 
     private void obtainLocks(long tid, Set<String> keys) {
         int numberOfLocks = keys.size();
@@ -442,11 +466,9 @@ public class SpannerServer {
             }
             LogUtils.debug(LOG_TAG, "Txn " + tid + " got all locks.");
             lockMap.put(tid, locks);
-        }
-        // TODO: need to handle locks in a better way. for ex. if txn fails, locks should be released
-        catch (Exception e) {
+        } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception while locking for txn tid:" + tid, e);
-            releaseLocks(tid);
+            tryReleaseLocks(tid);
         }
     }
 
@@ -461,7 +483,6 @@ public class SpannerServer {
             return;
         }
         LogUtils.debug(LOG_TAG, "Txn " + tid + " is releasing all locks.");
-        // TODO: release locks
         if (lockMap.containsKey(tid)) {
             Lock[] locks = lockMap.get(tid);
             for (Lock lock : locks) {
@@ -469,7 +490,6 @@ public class SpannerServer {
                     lock.unlock();
                 } catch (Exception e) {
                     LogUtils.error(LOG_TAG, "Exception while Unlocking for txn tid:" + tid, e);
-                    //TODO: add this lock to a global Unlocks list that should periodically run to release unheld locks
                 }
                 lockMap.remove(tid);
             }
@@ -498,7 +518,7 @@ class TState {
     CSTATE commit;
 
     public TState() {
-        numOtherShards = Config.NUM_CLUSTERS-1;
+        numOtherShards = Config.NUM_CLUSTERS - 1;
         prepareCount = new Semaphore(0);
         commit = CSTATE.UNKNOWN;
     }
@@ -509,7 +529,7 @@ class TState {
         commit = CSTATE.UNKNOWN;
     }
 
-    public void reInitNumShards(int nOtherShards){
+    public void reInitNumShards(int nOtherShards) {
         this.numOtherShards = nOtherShards;
     }
 
@@ -538,13 +558,13 @@ class TwoPC {
     }
 
     public void addNewTxn(long tid, int nShards) {
-        LogUtils.debug(LOG_TAG, "Adding txn " + tid + " to active map");
         if (txnState.containsKey(tid)) {
-            LogUtils.debug(LOG_TAG, "Add Txn called multiple times for same tid.");
+            LogUtils.debug(LOG_TAG, "Add Txn called multiple times for same tid => future txn ");
             TState tState = txnState.get(tid);
             tState.reInitNumShards(nShards);
             return;
         }
+        LogUtils.debug(LOG_TAG, "Adding txn " + tid + " to active map");
         txnState.put(tid, new TState(nShards));
     }
 
