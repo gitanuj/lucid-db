@@ -1,6 +1,5 @@
 package com.lucid.spanner;
 
-import com.google.common.util.concurrent.Striped;
 import com.lucid.common.*;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.NettyTransport;
@@ -13,12 +12,13 @@ import io.atomix.copycat.server.storage.StorageLevel;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.function.Consumer;
 
 public class SpannerServer {
 
@@ -29,7 +29,7 @@ public class SpannerServer {
     private int serverPort;
     private int paxosPort;
 
-    private Map<Long, Lock[]> lockMap;
+    private Map<Long, List<Semaphore>> lockMap;
 
     private CopycatClient copycatClient;
 
@@ -40,7 +40,7 @@ public class SpannerServer {
 
     private TwoPC twoPC;
 
-    private final Striped<Lock> stripedLocks = Striped.lazyWeakLock(100);
+    private final StripedExclusiveSemaphore stripedSemaphore = new StripedExclusiveSemaphore(100);
 
     public SpannerServer(AddressConfig addressConfig, int index) {
         Lucid.getInstance().onServerStarted();
@@ -51,11 +51,11 @@ public class SpannerServer {
         this.serverPort = addressConfig.getServerPort();
         this.clientPort = addressConfig.getClientPort();
         this.paxosPort = addressConfig.port();
-        this.lockMap = new HashMap<>();
+        this.lockMap = new ConcurrentHashMap<>();
 
         twoPC = new TwoPC();
         paxosMembers = new ArrayList<>();
-        leaders = new HashMap<>();
+        leaders = new ConcurrentHashMap<>();
         LogUtils.debug(LOG_TAG, "Initialing SpannerServer with host:" + host +
                 " paxosPort:" + paxosPort + " serverPort:" + serverPort + " clientPort:" + clientPort);
 
@@ -306,7 +306,7 @@ public class SpannerServer {
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Error during 2PC handling.", e);
             } finally {
-                if (transportObject.isCoordinator())
+                if (transportObject != null && transportObject.isCoordinator())
                     tryReleaseLocks(tid);
                 if (client != null) {
                     try {
@@ -455,14 +455,14 @@ public class SpannerServer {
     private void obtainLocks(long tid, Set<String> keys) {
         int numberOfLocks = keys.size();
         int counter = 0;
-        Lock[] locks = new Lock[numberOfLocks];
+        List<Semaphore> locks = new ArrayList<>();
         LogUtils.debug(LOG_TAG, "Getting locks for txn:" + tid + " keys:" + keys);
         try {
             LogUtils.debug(LOG_TAG, "Txn " + tid + " is waiting for locks.");
             for (String key : keys) {
-                locks[counter] = stripedLocks.get(key);
-                locks[counter].lock();
-                counter++;
+                Semaphore semaphore = stripedSemaphore.get(key);
+                semaphore.acquire();
+                locks.add(semaphore);
             }
             LogUtils.debug(LOG_TAG, "Txn " + tid + " got all locks.");
             lockMap.put(tid, locks);
@@ -484,10 +484,10 @@ public class SpannerServer {
         }
         LogUtils.debug(LOG_TAG, "Txn " + tid + " is releasing all locks.");
         if (lockMap.containsKey(tid)) {
-            Lock[] locks = lockMap.get(tid);
-            for (Lock lock : locks) {
+            List<Semaphore> locks = lockMap.get(tid);
+            for (Semaphore lock : locks) {
                 try {
-                    lock.unlock();
+                    lock.release();
                 } catch (Exception e) {
                     LogUtils.error(LOG_TAG, "Exception while Unlocking for txn tid:" + tid, e);
                 }
