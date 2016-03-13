@@ -55,18 +55,23 @@ public class RCClient implements YCSBClient {
         LogUtils.debug(LOG_TAG, "Number of read request-threads made: " + readThreadsCounter);
 
         // Sleep till notified either when a majority of requests have come back, or more than 10 seconds have elapsed.
-        synchronized (readsWaitOnMe) {
-            readsWaitOnMe.wait(10 * 1000);
+        try{
+            synchronized (readsWaitOnMe) {
+                readsWaitOnMe.wait(10 * 1000);
+            }
         }
+        catch(InterruptedException e){
+            // Interrupt all running read threads.
+            interruptAllRunningThreads(clientRequests, readThreadsCounter);
 
-        // Interrupt all running read threads.
-        interruptAllRunningThreads(clientRequests, readThreadsCounter);
+            if (readsReturned < readThreadsCounter / 2) // Read unsuccessful because majority of read threads
+                // did not return.
+                throw new UnsuccessfulReadException("Read unsuccessful because majority of threads did not return.");
 
-        if (readsReturned < readThreadsCounter / 2) // Read unsuccessful because majority of read threads
-            // did not return.
-            throw new UnsuccessfulReadException("Read unsuccessful because majority of threads did not return.");
-
-        return highestVersionResult;
+            return highestVersionResult;
+        }
+        LogUtils.debug(LOG_TAG, "Read timed out.");
+        return null;
     }
 
     @Override
@@ -100,17 +105,21 @@ public class RCClient implements YCSBClient {
 
                 LogUtils.debug(LOG_TAG, "Number of write request-threads made: " + writeThreadsCounter);
 
-                // Sleep till notified either when a majority of requests have come back, or more than 10 seconds have elapsed.
-                synchronized (writesWaitOnMe) {
-                    writesWaitOnMe.wait(10 * 1000);
+                try{
+                    // Sleep till notified either when a majority of requests have come back, or more than 10 seconds
+                    // have elapsed.
+                    synchronized (writesWaitOnMe) {
+                        writesWaitOnMe.wait(10 * 1000);
+                    }
+                }catch (InterruptedException e){
+                    // Interrupt all running read threads.
+                    interruptAllRunningThreads(clientRequests, writeThreadsCounter);
+
+                    if (writeSuccessful)
+                        return true;
                 }
-
-                // Interrupt all running read threads.
-                interruptAllRunningThreads(clientRequests, writeThreadsCounter);
-
-                if (writeSuccessful)
-                    return true;
-
+                LogUtils.debug(LOG_TAG, "Write timed out.");
+                return false;
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Something went wrong.", e);
             }
