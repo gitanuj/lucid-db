@@ -2,10 +2,10 @@ package com.lucid.rc;
 
 import com.google.common.util.concurrent.Striped;
 import com.lucid.common.*;
+import com.lucid.rc.ServerMsg.Message;
 
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -343,55 +343,6 @@ public class RCServer {
                 LogUtils.debug(LOG_TAG, "Retrying connection to replica server " + addressConfig);
                 executorService.schedule(this, RETRY_BACKOFF, TimeUnit.MILLISECONDS);
             }
-        }
-    }
-
-    private enum Message {
-        _2PC_PREPARE, ACK_2PC_PREPARE, _2PC_ACCEPT, _2PC_COMMIT
-    }
-
-    private class ServerMsg implements Serializable {
-
-        private long txn_id;
-
-        private Message message;
-
-        private String key;
-
-        private Map<String, String> map;
-
-        private AddressConfig coordinator;
-
-        public ServerMsg(Message message, ServerMsg serverMsg) {
-            this(message, serverMsg.getKey(), serverMsg.getMap(), serverMsg.getTxn_id(), serverMsg.getCoordinator());
-        }
-
-        public ServerMsg(Message message, String key, Map<String, String> map, long txn_id, AddressConfig coordinator) {
-            this.message = message;
-            this.key = key;
-            this.map = map;
-            this.txn_id = txn_id;
-            this.coordinator = coordinator;
-        }
-
-        public long getTxn_id() {
-            return txn_id;
-        }
-
-        public Message getMessage() {
-            return message;
-        }
-
-        public String getKey() {
-            return key;
-        }
-
-        public Map<String, String> getMap() {
-            return map;
-        }
-
-        public AddressConfig getCoordinator() {
-            return coordinator;
         }
     }
 }
