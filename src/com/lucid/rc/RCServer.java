@@ -7,14 +7,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class RCServer {
@@ -41,13 +35,13 @@ public class RCServer {
 
     private final Map<AddressConfig, ObjectOutputStream> replicaOutputStreams = new HashMap<>();
 
-    private final Map<Long, List<Semaphore>> txnLocks = new HashMap<>();
+    private final Map<Long, List<Semaphore>> txnLocks = new ConcurrentHashMap<>();
 
-    private final Map<Long, Semaphore> ackLocks = new HashMap<>();
+    private final Map<Long, Semaphore> ackLocks = new ConcurrentHashMap<>();
 
-    private final Map<Long, AtomicInteger> counter = new HashMap<>();
+    private final Map<Long, AtomicInteger> counter = new ConcurrentHashMap<>();
 
-    private final StripedExclusiveSemaphore stripedSemaphore = new StripedExclusiveSemaphore(512);
+    private final StripedExclusiveSemaphore stripedSemaphore = new StripedExclusiveSemaphore(256);
 
     public RCServer(AddressConfig addressConfig, int index) {
         Lucid.getInstance().onServerStarted();
@@ -215,7 +209,7 @@ public class RCServer {
             ServerMsg commitMsg = new ServerMsg(msg, Message._2PC_COMMIT);
 
             // Send 2PC Commit to datacenter servers
-            List<AddressConfig> datacenterIPs = getDatacenterIPsFor(msg.getMap());
+            Set<AddressConfig> datacenterIPs = getDatacenterIPsFor(msg.getMap());
             for (AddressConfig config : datacenterIPs) {
                 ObjectOutputStream oos = datacenterOutputStreams.get(config);
                 synchronized (oos) {
@@ -246,7 +240,7 @@ public class RCServer {
             try {
                 ServerSocket ss = new ServerSocket(clientPort);
                 while (true) {
-                    handleClientMsg(ss.accept());
+                    readClientMsg(ss.accept());
                 }
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Something went wrong in accept-client thread", e);
@@ -256,15 +250,13 @@ public class RCServer {
         Utils.startThreadWithName(runnable, "accept-client");
     }
 
-    private void handleClientMsg(Socket client) {
+    private void readClientMsg(Socket client) {
         Runnable runnable = () -> {
-            ObjectInputStream inputStream = null;
-            ObjectOutputStream outputStream = null;
             TransportObject msg = null;
 
             try {
-                inputStream = new ObjectInputStream(client.getInputStream());
-                outputStream = new ObjectOutputStream(client.getOutputStream());
+                ObjectInputStream inputStream = new ObjectInputStream(client.getInputStream());
+                ObjectOutputStream outputStream = new ObjectOutputStream(client.getOutputStream());
                 msg = (TransportObject) inputStream.readObject();
 
                 // Create semaphore
@@ -272,19 +264,18 @@ public class RCServer {
 
                 handleClientMsg(msg, outputStream);
             } catch (Exception e) {
-                LogUtils.error(LOG_TAG, "Something went wrong in handle-client thread", e);
+                LogUtils.error(LOG_TAG, "Something went wrong in read-client thread", e);
             } finally {
-                Utils.closeQuietly(inputStream);
-                Utils.closeQuietly(outputStream);
+                Utils.closeQuietly(client);
 
                 // Clear semaphore
-                if (msg != null) {
-                    ackLocks.remove(msg.getTxn_id());
-                }
+//                if (msg != null) {
+//                    ackLocks.remove(msg.getTxn_id());
+//                }
             }
         };
 
-        Utils.startThreadWithName(runnable, "handle-client");
+        Utils.startThreadWithName(runnable, "read-client");
     }
 
     private void handleClientMsg(TransportObject msg, ObjectOutputStream outputStream) throws Exception {
@@ -300,7 +291,7 @@ public class RCServer {
 
             // Send 2PC PREPARE to shards within datacenter
             ServerMsg _2PCPrepare = new ServerMsg(serverMsg, Message._2PC_PREPARE);
-            List<AddressConfig> datacenterIPs = getDatacenterIPsFor(msg.getWriteMap());
+            Set<AddressConfig> datacenterIPs = getDatacenterIPsFor(msg.getWriteMap());
             for (AddressConfig config : datacenterIPs) {
                 ObjectOutputStream oos = datacenterOutputStreams.get(config);
                 synchronized (oos) {
@@ -325,8 +316,8 @@ public class RCServer {
         }
     }
 
-    private List<AddressConfig> getDatacenterIPsFor(Map<String, String> writeMap) {
-        List<AddressConfig> ips = new ArrayList<>();
+    private Set<AddressConfig> getDatacenterIPsFor(Map<String, String> writeMap) {
+        Set<AddressConfig> ips = new HashSet<>();
         for (String key : writeMap.keySet()) {
             for (AddressConfig config : datacenterIPs) {
                 if (serverContainsKey(config, key)) {
