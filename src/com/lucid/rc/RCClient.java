@@ -9,69 +9,167 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.List;
-import java.util.Scanner;
 
 public class RCClient implements YCSBClient {
 
     private static final String LOG_TAG = "RC_CLIENT";
-    private ReadMajoritySelector readMajoritySelector;
-    private WriteMajoritySelector writeMajoritySelector;
-    private Object readsWaitOnMe;
-    private Object writesWaitOnMe;
-    private int readThreadsCounter;
-    private int readsReturned;
-    private long highestVersionRead;
-    private String highestVersionResult;
-    private int writesReturned;
-    private int writeThreadsCounter;
-    private boolean writeSuccessful;
-    private long writeTxnId;
 
+    private class WriteFlags {
+        private int writesReturned;
+        private int writeThreadsCounter;
+        private Object writesWaitOneMe;
+        WriteMajoritySelector writeMajoritySelector;
+        private boolean writeSuccessful;
+        private long writeTxnId;
+
+        WriteFlags(){
+            this.writesReturned = 0;
+            this.writeThreadsCounter = 0;
+            this.writesWaitOneMe = new Object();
+            this.writeMajoritySelector = new WriteMajoritySelector();
+            this.writeSuccessful = false;
+            this.writeTxnId = Config.TXN_ID_NOT_APPLICABLE;
+        }
+
+        public WriteMajoritySelector getWriteMajoritySelector() {
+            return writeMajoritySelector;
+        }
+
+        public Object getWritesWaitOneMe() {
+            return writesWaitOneMe;
+        }
+
+        public int getWritesReturned() {
+            return writesReturned;
+        }
+
+        public void setWritesReturned(int writesReturned) {
+            this.writesReturned = writesReturned;
+        }
+
+        public int getWriteThreadsCounter() {
+            return writeThreadsCounter;
+        }
+
+        public void setWriteThreadsCounter(int writeThreadsCounter) {
+            this.writeThreadsCounter = writeThreadsCounter;
+        }
+
+        public boolean isWriteSuccessful() {
+            return writeSuccessful;
+        }
+
+        public void setWriteSuccessful(boolean writeSuccessful) {
+            this.writeSuccessful = writeSuccessful;
+        }
+
+        public long getWriteTxnId() {
+            return writeTxnId;
+        }
+
+        public void setWriteTxnId(long writeTxnId) {
+            this.writeTxnId = writeTxnId;
+        }
+    }
+
+    private class ReadFlags {
+        private int readThreadsCounter;
+        private int readsReturned;
+        private ReadMajoritySelector readMajoritySelector;
+        private Object readsWaitOnMe;
+        private long highestVersionRead;
+        private String highestVersionResult;
+
+        public ReadFlags() {
+            this.readsReturned = 0;
+            this.readsWaitOnMe = new Object();
+            this.readThreadsCounter = 0;
+            this.highestVersionRead = -1;
+            this.highestVersionResult = null;
+            this.readMajoritySelector = new ReadMajoritySelector();
+        }
+
+        public Object getReadsWaitOnMe() {
+            return readsWaitOnMe;
+        }
+
+        public ReadMajoritySelector getReadMajoritySelector() {
+            return readMajoritySelector;
+        }
+
+        public void setReadMajoritySelector(ReadMajoritySelector readMajoritySelector) {
+            this.readMajoritySelector = readMajoritySelector;
+        }
+
+        public int getReadThreadsCounter() {
+            return readThreadsCounter;
+        }
+
+        public void setReadThreadsCounter(int readThreadsCounter) {
+            this.readThreadsCounter = readThreadsCounter;
+        }
+
+        public int getReadsReturned() {
+            return readsReturned;
+        }
+
+        public void setReadsReturned(int readsReturned) {
+            this.readsReturned = readsReturned;
+        }
+
+        public long getHighestVersionRead() {
+            return highestVersionRead;
+        }
+
+        public void setHighestVersionRead(long highestVersionRead) {
+            this.highestVersionRead = highestVersionRead;
+        }
+
+        public String getHighestVersionResult() {
+            return highestVersionResult;
+        }
+
+        public void setHighestVersionResult(String highestVersionResult) {
+            this.highestVersionResult = highestVersionResult;
+        }
+
+    }
 
     @Override
     public String executeQuery(Query query) throws Exception {
 
         List<AddressConfig> queryShards = Utils.getReplicaClusterIPs(((ReadQuery) query).key());
         Thread[] clientRequests = new Thread[queryShards.size()];
-        readsWaitOnMe = new Object();
-        readThreadsCounter = 0;
-        readMajoritySelector = new ReadMajoritySelector();
-        readsReturned = 0;
-        highestVersionRead = -1;
-        highestVersionResult = null;
+        ReadFlags readFlags = new ReadFlags();
 
         // Execute query on all servers.
         for (AddressConfig shard : queryShards) {
             try {
-                clientRequests[readThreadsCounter] = new Thread(new QueryCluster(shard, (ReadQuery) query));
-                clientRequests[readThreadsCounter].start();
-                readThreadsCounter++;
+                clientRequests[readFlags.getReadThreadsCounter()] = new Thread(new QueryCluster(shard, (ReadQuery)
+                        query, readFlags));
+                clientRequests[readFlags.getReadThreadsCounter()].start();
+                readFlags.setReadThreadsCounter(readFlags.getReadThreadsCounter() + 1);
             } catch (Exception e) {
                 LogUtils.debug(LOG_TAG, "Key: " + ((ReadQuery) query).key() + ". Something went wrong while" +
-                        " starting thread number " + (readThreadsCounter - 1), e);
+                        " starting thread number " + (readFlags.getReadThreadsCounter() - 1), e);
             }
         }
 
-        LogUtils.debug(LOG_TAG, "Number of read request-threads made: " + readThreadsCounter);
+        LogUtils.debug(LOG_TAG, "Number of read request-threads made: " + readFlags.getReadThreadsCounter());
 
         // Sleep till notified either when a majority of requests have come back, or more than 10 seconds have elapsed.
-        try{
-            synchronized (readsWaitOnMe) {
-                readsWaitOnMe.wait(10 * 1000);
-            }
+        synchronized (readFlags.getReadsWaitOnMe()) {
+            readFlags.getReadsWaitOnMe().wait(10 * 1000);
         }
-        catch(InterruptedException e){
-            // Interrupt all running read threads.
-            interruptAllRunningThreads(clientRequests, readThreadsCounter);
+        // Interrupt all running read threads.
+        interruptAllRunningThreads(clientRequests, readFlags.getReadThreadsCounter());
 
-            if (readsReturned < readThreadsCounter / 2) // Read unsuccessful because majority of read threads
-                // did not return.
-                throw new UnsuccessfulReadException("Read unsuccessful because majority of threads did not return.");
+        if (readFlags.getReadsReturned() < readFlags.getReadThreadsCounter() / 2) // Read unsuccessful because majority of read
+            // threads
+            // did not return.
+            throw new UnsuccessfulReadException("Read unsuccessful because majority of threads did not return.");
 
-            return highestVersionResult;
-        }
-        LogUtils.debug(LOG_TAG, "Read timed out.");
-        return null;
+        return readFlags.getHighestVersionResult();
     }
 
     @Override
@@ -82,44 +180,36 @@ public class RCClient implements YCSBClient {
                 List<AddressConfig> coordinators = Utils.getReplicaClusterIPs(((WriteCommand) command)
                         .getFirstKeyInThisCommand());
                 Thread[] clientRequests = new Thread[coordinators.size()];
-                writesWaitOnMe = new Object();
-                writesReturned = 0;
-                writeThreadsCounter = 0;
-                writeMajoritySelector = new WriteMajoritySelector();
-                writeSuccessful = false;
-                writeTxnId = ((WriteCommand) command).getTxn_id();
+                WriteFlags writeFlags = new WriteFlags();
+                writeFlags.setWriteTxnId(((WriteCommand) command).getTxn_id());
 
                 // Execute query on all servers.
                 for (AddressConfig shard : coordinators) {
                     try {
-                        clientRequests[writeThreadsCounter] = new Thread(new CommandCluster(shard, (WriteCommand) command));
-                        clientRequests[writeThreadsCounter].start();
-                        writeThreadsCounter++;
+                        clientRequests[writeFlags.getWriteThreadsCounter()] = new Thread(new CommandCluster(shard,
+                                (WriteCommand)command, writeFlags));
+                        clientRequests[writeFlags.getWriteThreadsCounter()].start();
+                        writeFlags.setWriteThreadsCounter(writeFlags.getWriteThreadsCounter() + 1);
                     } catch (Exception e) {
-                        LogUtils.debug(LOG_TAG, "Transaction ID: " + writeTxnId + ". Something " +
+                        LogUtils.debug(LOG_TAG, "Transaction ID: " + writeFlags.getWriteTxnId() + ". Something " +
                                 "went wrong " +
                                 "while" +
-                                " starting thread number " + (writeThreadsCounter - 1), e);
+                                " starting thread number " + (writeFlags.getWriteThreadsCounter()- 1), e);
                     }
                 }
 
-                LogUtils.debug(LOG_TAG, "Number of write request-threads made: " + writeThreadsCounter);
+                LogUtils.debug(LOG_TAG, "Number of write request-threads made: " + writeFlags.getWriteThreadsCounter());
 
-                try{
-                    // Sleep till notified either when a majority of requests have come back, or more than 10 seconds
-                    // have elapsed.
-                    synchronized (writesWaitOnMe) {
-                        writesWaitOnMe.wait(10 * 1000);
-                    }
-                }catch (InterruptedException e){
-                    // Interrupt all running read threads.
-                    interruptAllRunningThreads(clientRequests, writeThreadsCounter);
-
-                    if (writeSuccessful)
-                        return true;
+                // Sleep till notified either when a majority of requests have come back, or more than 10 seconds
+                // have elapsed.
+                synchronized (writeFlags.getWritesWaitOneMe()) {
+                    writeFlags.getWritesWaitOneMe().wait(10 * 1000);
                 }
-                LogUtils.debug(LOG_TAG, "Write timed out.");
-                return false;
+                interruptAllRunningThreads(clientRequests, writeFlags.getWriteThreadsCounter());
+
+                if (writeFlags.isWriteSuccessful())
+                    return true;
+
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Something went wrong.", e);
             }
@@ -146,10 +236,12 @@ public class RCClient implements YCSBClient {
         ObjectOutputStream writer;
         ObjectInputStream reader;
         Pair<Long, String> result;
+        ReadFlags readFlags;
 
-        public QueryCluster(AddressConfig server, ReadQuery query) {
+        public QueryCluster(AddressConfig server, ReadQuery query, ReadFlags readFlags) {
             this.server = server;
             this.query = query;
+            this.readFlags = readFlags;
         }
 
         @Override
@@ -166,7 +258,7 @@ public class RCClient implements YCSBClient {
                 socket.close();
 
                 // Report to ReadMajoritySelector object.
-                readMajoritySelector.threadReturned(result.getSecond(), result.getFirst());
+                readFlags.getReadMajoritySelector().threadReturned(result.getSecond(), result.getFirst(), readFlags);
             } catch (Exception e) {
                 LogUtils.debug(LOG_TAG, "Error in talking to server.", e);
             }
@@ -175,19 +267,19 @@ public class RCClient implements YCSBClient {
 
     private class ReadMajoritySelector {
 
-        public synchronized void threadReturned(String value, long version) {
-            readsReturned++;
+        public synchronized void threadReturned(String value, long version, ReadFlags readFlags) {
+            readFlags.setReadsReturned(readFlags.getReadsReturned() + 1);
 
             // Update the highest version, if the returned thread has a higher version.
-            if (version > highestVersionRead) {
-                highestVersionRead = version;
-                highestVersionResult = value;
+            if (version > readFlags.getHighestVersionRead()) {
+                readFlags.setHighestVersionRead(version);
+                readFlags.setHighestVersionResult(value);
             }
 
             // If majority threads have returned, notify readsWaitOnMe object.
-            if (readsReturned > ((readThreadsCounter / 2) + 1))
-                synchronized (readsWaitOnMe){
-                    readsWaitOnMe.notify();
+            if (readFlags.getReadsReturned() > (readFlags.getReadThreadsCounter() / 2))
+                synchronized (readFlags.getReadsWaitOnMe()){
+                    readFlags.getReadsWaitOnMe().notify();
                 }
         }
     }
@@ -198,10 +290,12 @@ public class RCClient implements YCSBClient {
         ObjectOutputStream writer;
         ObjectInputStream reader;
         Pair<Long, String> result;
+        WriteFlags writeFlags;
 
-        public CommandCluster(AddressConfig shard, WriteCommand command) {
+        public CommandCluster(AddressConfig shard, WriteCommand command, WriteFlags writeFlags) {
             this.server = shard;
             this.command = command;
+            this.writeFlags = writeFlags;
         }
 
         @Override
@@ -214,11 +308,11 @@ public class RCClient implements YCSBClient {
                 // Wait for response.
                 reader = new ObjectInputStream(socket.getInputStream());
                 result = (Pair<Long, String>)reader.readObject();
-                LogUtils.debug(LOG_TAG, "Result for txn id " + writeTxnId + " is " + result);
+                LogUtils.debug(LOG_TAG, "Result for txn id " + writeFlags.getWriteTxnId() + " is " + result);
                 socket.close();
 
                 // Report to WriteMajoritySelector object.
-                writeMajoritySelector.threadReturned(result);
+                writeFlags.getWriteMajoritySelector().threadReturned(result, writeFlags);
             } catch (Exception e) {
                 LogUtils.debug(LOG_TAG, "Error in talking to server.", e);
             }
@@ -233,21 +327,22 @@ public class RCClient implements YCSBClient {
             numberOfCommits = 0;
         }
 
-        public synchronized void threadReturned(Pair<Long, String> result) {
-            writesReturned++;
+        public synchronized void threadReturned(Pair<Long, String> result, WriteFlags writeFlags) {
+            writeFlags.setWritesReturned(writeFlags.getWritesReturned() + 1);
 
             if (result.getSecond().startsWith("COMMIT"))
                 numberOfCommits++;
 
             // If majority threads have returned, set result and notify writesWaitOnMe object.
-            if (writesReturned > writeThreadsCounter / 2) {
-                if (numberOfCommits > ((writeThreadsCounter / 2) + 1))
-                    writeSuccessful = true;
-                LogUtils.debug(LOG_TAG, "Number of data centres where transaction ID " + writeTxnId + " committed " +
+            if (writeFlags.getWritesReturned() > writeFlags.getWriteThreadsCounter() / 2) {
+                if (numberOfCommits > (writeFlags.getWriteThreadsCounter()/ 2))
+                    writeFlags.setWriteSuccessful(true);
+                LogUtils.debug(LOG_TAG, "Number of data centres where transaction ID " + writeFlags.getWriteTxnId() +
+                        " committed " +
                         "are " + numberOfCommits);
 
-                synchronized (writesWaitOnMe){
-                    writesWaitOnMe.notify();
+                synchronized (writeFlags.getWritesWaitOneMe()){
+                    writeFlags.getWritesWaitOneMe().notify();
                 }
             }
         }
