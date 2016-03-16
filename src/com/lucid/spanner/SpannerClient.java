@@ -29,6 +29,9 @@ public class SpannerClient implements YCSBClient {
 
     @Override
     public String executeQuery(Query query) throws InterruptedException, ExecutionException, TimeoutException {
+
+        // Simulate Spanner client to closest datacenter latency, and write object to datacenter.
+        Thread.sleep(Config.SPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY);
         return (String) copycatClient.submit(query).get(Config.READ_QUERY_TIMEOUT, TimeUnit.MILLISECONDS);
     }
 
@@ -83,6 +86,7 @@ public class SpannerClient implements YCSBClient {
             int clusterId = (Integer) entry.getKey();
             for (AddressConfig address : Utils.getReplicaClusterIPs(clusterId)) {
                 try {
+                    // TODO simulate latencies here.
                     socket = new Socket(address.host(), address.getClientPort());
                     reader = new Scanner(new InputStreamReader(socket.getInputStream()));
                     if (reader.nextInt() == 1) {
@@ -124,6 +128,8 @@ public class SpannerClient implements YCSBClient {
             for (Map.Entry<Socket, Map<String, String>> entry : commitObject.entrySet()) {
                 socket = entry.getKey();
                 writer = new ObjectOutputStream(socket.getOutputStream());
+
+                // TODO simulate latencies here.
                 writer.writeObject(new TransportObject(coordinatorAddress, ((WriteCommand) command).getTxn_id(),
                         entry.getValue(), sMap.size(), coordinatorSocket == socket));
                 if (socket != coordinatorSocket)

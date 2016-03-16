@@ -249,6 +249,9 @@ public class RCClient implements YCSBClient {
             try {
                 Socket socket = new Socket(server.host(), server.getClientPort());
                 writer = new ObjectOutputStream(socket.getOutputStream());
+
+                // Simulate RC client to datacenter average latency, and write object to datacenter.
+                Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
                 writer.writeObject(new TransportObject(Config.TXN_ID_NOT_APPLICABLE, query.key()));
 
                 // Wait for response.
@@ -303,6 +306,9 @@ public class RCClient implements YCSBClient {
             try {
                 Socket socket = new Socket(server.host(), server.getClientPort());
                 writer = new ObjectOutputStream(socket.getOutputStream());
+
+                // Simulate RC client to datacenter average latency, and write object to datacenter.
+                Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
                 writer.writeObject(new TransportObject(command.getTxn_id(), command.getWriteCommands()));
 
                 // Wait for response.

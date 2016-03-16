@@ -18,6 +18,11 @@ public final class Config {
     public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
     public static long READ_QUERY_TIMEOUT;
     public static long COMMAND_TIMEOUT;
+    public static int SPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY;
+    public static int SPANNER_INTER_DATACENTER_LATENCY;
+    public static int RC_CLIENT_TO_DATACENTER_AVG_LATENCY;
+    public static int RC_INTER_DATACENTER_LATENCY;
+    public static int INTRA_DATACENTER_LATENCY;
 
     // SERVER_IPS list structure - contiguous blocks of shard replicas.
     static {
@@ -31,6 +36,12 @@ public final class Config {
             NUM_CLUSTERS = properties.getNumClusters();
             READ_QUERY_TIMEOUT = properties.getReadQueryTimeout();
             COMMAND_TIMEOUT = properties.getCommandTimeout();
+
+            SPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY = properties.getSPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY();
+            SPANNER_INTER_DATACENTER_LATENCY = properties.getSPANNER_INTER_DATACENTER_LATENCY();
+            RC_CLIENT_TO_DATACENTER_AVG_LATENCY = properties.getRC_CLIENT_TO_DATACENTER_AVG_LATENCY();
+            RC_INTER_DATACENTER_LATENCY = properties.getRC_INTER_DATACENTER_LATENCY();
+            INTRA_DATACENTER_LATENCY = properties.getINTRA_DATACENTER_LATENCY();
 
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Failed to load config", e);
