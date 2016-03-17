@@ -260,10 +260,14 @@ public class RCClient implements YCSBClient {
 
                 socket.close();
 
+                if(result == null)
+                    throw new Exception();
+
                 // Report to ReadMajoritySelector object.
                 readFlags.getReadMajoritySelector().threadReturned(result.getSecond(), result.getFirst(), readFlags);
             } catch (Exception e) {
-                LogUtils.debug(LOG_TAG, "Error in talking to server.", e);
+                e.printStackTrace();
+                LogUtils.debug(LOG_TAG, "Something went wrong.", e);
             }
         }
     }
