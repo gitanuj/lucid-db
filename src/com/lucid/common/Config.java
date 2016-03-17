@@ -24,6 +24,7 @@ public final class Config {
     public static int RC_INTER_DATACENTER_LATENCY;
     public static int INTRA_DATACENTER_LATENCY;
     public static int LOCK_TABLE_SIZE;
+    public static int SPANNER = 0;
 
     // SERVER_IPS list structure - contiguous blocks of shard replicas.
     static {

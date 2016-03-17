@@ -1,5 +1,6 @@
 package com.lucid.ycsb;
 
+import com.lucid.common.Config;
 import com.lucid.common.LogUtils;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.RandomByteIterator;
@@ -16,14 +17,16 @@ public class YCSBTester {
     private static final List<Thread> THREADS = new ArrayList<>();
 
     public static void main(String[] args) {
-        startTest();
+        startTest(Integer.parseInt(args[0]), Integer.parseInt(args[1]));
     }
 
-    private static void startTest() {
+    private static void startTest(int numberOfThreads, int protocol) {
 
-        YCSBDB ycsbdb = new SpannerDB();
+        YCSBDB ycsbdb;
+        if(protocol == Config.SPANNER) ycsbdb = new SpannerDB();
+        else ycsbdb = new RCDB();
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < numberOfThreads; i++) {
             final int id = i;
             Thread t = new Thread(() -> {
                 String table = "table";
