@@ -47,7 +47,7 @@ public class SpannerServer {
         LOG_TAG = "SPANNER_SERVER-" + index;
 
         this.index = index;
-        this.host = "localhost";//addressConfig.host();
+        this.host = "127.0.0.1";//addressConfig.host();
         this.serverPort = addressConfig.getServerPort();
         this.clientPort = addressConfig.getClientPort();
         this.paxosPort = addressConfig.port();
