@@ -10,8 +10,10 @@ import io.atomix.copycat.server.storage.Storage;
 import io.atomix.copycat.server.storage.StorageLevel;
 
 import java.io.*;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +49,11 @@ public class SpannerServer {
         LOG_TAG = "SPANNER_SERVER-" + index;
 
         this.index = index;
-        this.host = "127.0.0.1";//addressConfig.host();
+        try {
+            this.host = InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+            LogUtils.debug(LOG_TAG, "Cannot get hostname:", e);
+        }
         this.serverPort = addressConfig.getServerPort();
         this.clientPort = addressConfig.getClientPort();
         this.paxosPort = addressConfig.port();
