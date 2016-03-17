@@ -260,11 +260,14 @@ public class RCClient implements YCSBClient {
 
                 socket.close();
 
+                if(result == null)
+                    throw new Exception();
+
                 // Report to ReadMajoritySelector object.
                 readFlags.getReadMajoritySelector().threadReturned(result.getSecond(), result.getFirst(), readFlags);
             } catch (Exception e) {
                 e.printStackTrace();
-                LogUtils.debug(LOG_TAG, "Error in talking to server.", e);
+                LogUtils.debug(LOG_TAG, "Something went wrong.", e);
             }
         }
     }
@@ -321,7 +324,6 @@ public class RCClient implements YCSBClient {
                 // Report to WriteMajoritySelector object.
                 writeFlags.getWriteMajoritySelector().threadReturned(result, writeFlags);
             } catch (Exception e) {
-                e.printStackTrace();
                 LogUtils.debug(LOG_TAG, "Error in talking to server.", e);
             }
         }
