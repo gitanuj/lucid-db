@@ -18,6 +18,8 @@ public class Properties {
     private int RC_INTER_DATACENTER_LATENCY;
     private int INTRA_DATACENTER_LATENCY;
 
+    private int LOCK_TABLE_SIZE;
+
     public int getRC_INTER_DATACENTER_LATENCY() {
         return RC_INTER_DATACENTER_LATENCY;
     }
@@ -40,6 +42,10 @@ public class Properties {
 
     public int getNumClusters() {
         return numClusters;
+    }
+
+    public int getLockTableSize() {
+        return LOCK_TABLE_SIZE;
     }
 
     public List<AddressConfig> getAddressConfigs() {

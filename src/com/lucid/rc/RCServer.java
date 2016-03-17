@@ -41,7 +41,7 @@ public class RCServer {
 
     private final Map<Long, AtomicInteger> counter = new ConcurrentHashMap<>();
 
-    private final StripedExclusiveSemaphore stripedSemaphore = new StripedExclusiveSemaphore(256);
+    private final StripedExclusiveSemaphore stripedSemaphore = new StripedExclusiveSemaphore(Config.LOCK_TABLE_SIZE);
 
     public RCServer(AddressConfig addressConfig, int index) {
         Lucid.getInstance().onServerStarted();

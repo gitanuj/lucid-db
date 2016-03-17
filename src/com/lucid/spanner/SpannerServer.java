@@ -40,7 +40,7 @@ public class SpannerServer {
 
     private TwoPC twoPC;
 
-    private final StripedExclusiveSemaphore stripedSemaphore = new StripedExclusiveSemaphore(100);
+    private final StripedExclusiveSemaphore stripedSemaphore = new StripedExclusiveSemaphore(Config.LOCK_TABLE_SIZE);
 
     public SpannerServer(AddressConfig addressConfig, int index) {
         Lucid.getInstance().onServerStarted();
