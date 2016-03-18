@@ -26,8 +26,8 @@ public class YCSBTester {
 
     private static void startUtilsTest() {
         for (int i = 0; i < Config.SERVER_IPS.size(); ++i) {
-            List<AddressConfig> datacenterIPs = Utils.getReplicaIPs(i);
-            Utils.printList(datacenterIPs);
+            List<AddressConfig> ips = Utils.getDatacenterIPs(i);
+            Utils.printList(ips);
         }
     }
 
