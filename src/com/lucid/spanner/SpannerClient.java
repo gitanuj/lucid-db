@@ -7,9 +7,11 @@ import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
 
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -17,12 +19,10 @@ import java.util.concurrent.TimeoutException;
 public class SpannerClient implements YCSBClient {
 
     private static final String LOG_TAG = "SPANNER_CLIENT";
-
     private CopycatClient copycatClient;
 
     public SpannerClient() {
         Lucid.getInstance().onClientStarted();
-
         copycatClient = SpannerUtils.buildClient(SpannerUtils.toAddress(Config.SERVER_IPS));
         copycatClient.open().join();
     }
@@ -57,6 +57,7 @@ public class SpannerClient implements YCSBClient {
         // pairs of objects to commit in that cluster.
         HashMap<Integer, List<String>> sMap; // Maps cluster IDs to keys.
         Socket socket, coordinatorSocket = null;
+        ObjectInputStream objectReader;
         Scanner reader;
         AddressConfig coordinatorAddress = null;
         ObjectOutputStream writer;
@@ -84,9 +85,43 @@ public class SpannerClient implements YCSBClient {
         // Determine leaders.
         for (Map.Entry entry : sMap.entrySet()) {
             int clusterId = (Integer) entry.getKey();
-            for (AddressConfig address : Utils.getReplicaClusterIPs(clusterId)) {
+            try{
+                // Talk to the first server in this replica cluster asking for leader AddressConfig.
+                AddressConfig address = Utils.getReplicaClusterIPs(clusterId).get(0);
+
+                Thread.sleep(Config.DETERMINE_SPANNER_LEADER_PING_LATENCY);
+                socket = new Socket(address.host(), address.getClientPort());
+                objectReader = new ObjectInputStream(socket.getInputStream());
+                AddressConfig leaderAddressForThisClusterId = (AddressConfig)objectReader.readObject();
+
+                // If no leader found for this replica cluster, abort.
+                if(leaderAddressForThisClusterId == null){
+                    LogUtils.debug(LOG_TAG, "Leader for cluster ID " + clusterId + " is null.");
+                    return false;
+                }
+
+                // Connect to the leader.
+                socket = new Socket(leaderAddressForThisClusterId.host(), leaderAddressForThisClusterId.getClientPort());
+
+                // Choose coordinator.
+                if (coordinatorSocket == null) {
+                    coordinatorSocket = socket;
+                    LogUtils.debug(LOG_TAG, " Coordinator for transaction " + ((WriteCommand) command).getTxn_id() + " is " + coordinatorSocket.getInetAddress().getHostAddress() + ":"
+                            + coordinatorSocket.getPort());
+                    coordinatorAddress = leaderAddressForThisClusterId;
+                }
+
+                LogUtils.debug(LOG_TAG, " Leader for Cluster ID " + clusterId + " is " +
+                        leaderAddressForThisClusterId.host() + ":" + leaderAddressForThisClusterId.getClientPort());
+                sessionMap.put(clusterId, socket);
+            }
+            catch(Exception e){
+                LogUtils.error(LOG_TAG, "Something went wrong", e);
+            }
+
+            /*for (AddressConfig address : Utils.getReplicaClusterIPs(clusterId)) {
                 try {
-                    // TODO simulate latencies here.
+                    // Simulate latencies here.
                     socket = new Socket(address.host(), address.getClientPort());
                     reader = new Scanner(new InputStreamReader(socket.getInputStream()));
                     if (reader.nextInt() == 1) {
@@ -111,7 +146,8 @@ public class SpannerClient implements YCSBClient {
                 } catch (Exception e) {
                     LogUtils.error(LOG_TAG, "Something went wrong", e);
                 }
-            }
+            }*/
+
             if (sessionMap.get(clusterId) == null)
                 throw new LeaderNotFound(LOG_TAG + " Leader not found for cluster ID " + clusterId);
         }
@@ -129,7 +165,7 @@ public class SpannerClient implements YCSBClient {
                 socket = entry.getKey();
                 writer = new ObjectOutputStream(socket.getOutputStream());
 
-                // TODO simulate latencies here.
+                Thread.sleep(Config.SPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY);
                 writer.writeObject(new TransportObject(coordinatorAddress, ((WriteCommand) command).getTxn_id(),
                         entry.getValue(), sMap.size(), coordinatorSocket == socket));
                 if (socket != coordinatorSocket)

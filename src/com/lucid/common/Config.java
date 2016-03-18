@@ -25,6 +25,7 @@ public final class Config {
     public static int INTRA_DATACENTER_LATENCY;
     public static int LOCK_TABLE_SIZE;
     public static int SPANNER = 0;
+    public static int DETERMINE_SPANNER_LEADER_PING_LATENCY;
 
     // SERVER_IPS list structure - contiguous blocks of shard replicas.
     static {
@@ -44,7 +45,7 @@ public final class Config {
             RC_CLIENT_TO_DATACENTER_AVG_LATENCY = properties.getRC_CLIENT_TO_DATACENTER_AVG_LATENCY();
             RC_INTER_DATACENTER_LATENCY = properties.getRC_INTER_DATACENTER_LATENCY();
             INTRA_DATACENTER_LATENCY = properties.getINTRA_DATACENTER_LATENCY();
-
+            DETERMINE_SPANNER_LEADER_PING_LATENCY = properties.getDETERMINE_SPANNER_LEADER_PING_LATENCY();
             LOCK_TABLE_SIZE = properties.getLockTableSize();
 
         } catch (Exception e) {

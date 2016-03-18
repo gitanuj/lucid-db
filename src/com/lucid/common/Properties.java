@@ -17,8 +17,14 @@ public class Properties {
     private int RC_CLIENT_TO_DATACENTER_AVG_LATENCY;
     private int RC_INTER_DATACENTER_LATENCY;
     private int INTRA_DATACENTER_LATENCY;
+    private int DETERMINE_SPANNER_LEADER_PING_LATENCY;
 
     private int LOCK_TABLE_SIZE;
+
+
+    public int getDETERMINE_SPANNER_LEADER_PING_LATENCY() {
+        return DETERMINE_SPANNER_LEADER_PING_LATENCY;
+    }
 
     public int getRC_INTER_DATACENTER_LATENCY() {
         return RC_INTER_DATACENTER_LATENCY;
