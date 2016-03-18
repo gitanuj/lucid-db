@@ -260,11 +260,8 @@ public class RCClient implements YCSBClient {
 
                 socket.close();
 
-                if(result == null)
-                    throw new Exception();
-
                 // Report to ReadMajoritySelector object.
-                readFlags.getReadMajoritySelector().threadReturned(result.getSecond(), result.getFirst(), readFlags);
+                readFlags.getReadMajoritySelector().threadReturned(result, readFlags);
             } catch (Exception e) {
                 e.printStackTrace();
                 LogUtils.debug(LOG_TAG, "Something went wrong.", e);
@@ -274,15 +271,15 @@ public class RCClient implements YCSBClient {
 
     private class ReadMajoritySelector {
 
-        public synchronized void threadReturned(String value, long version, ReadFlags readFlags) {
+        public synchronized void threadReturned(Pair<Long, String> result, ReadFlags readFlags) {
             readFlags.setReadsReturned(readFlags.getReadsReturned() + 1);
 
-            // Update the highest version, if the returned thread has a higher version.
-            if (version > readFlags.getHighestVersionRead()) {
-                readFlags.setHighestVersionRead(version);
-                readFlags.setHighestVersionResult(value);
+            // Update the highest version, if the returned thread has a higher version and the result is not null.
+            if (result != null && result.getFirst() > readFlags.getHighestVersionRead()) {
+                readFlags.setHighestVersionRead(result.getFirst());
+                readFlags.setHighestVersionResult(result.getSecond());
             }
-
+            
             // If majority threads have returned, notify readsWaitOnMe object.
             if (readFlags.getReadsReturned() > (readFlags.getReadThreadsCounter() / 2))
                 synchronized (readFlags.getReadsWaitOnMe()){

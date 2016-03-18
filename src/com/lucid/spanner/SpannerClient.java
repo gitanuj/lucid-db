@@ -86,7 +86,7 @@ public class SpannerClient implements YCSBClient {
             try {
                 // Talk to the first server in this replica cluster asking for leader AddressConfig.
                 AddressConfig address = Utils.getReplicaClusterIPs(clusterId).get(0);
-
+                    
                 Thread.sleep(Config.DETERMINE_SPANNER_LEADER_PING_LATENCY);
                 socket = new Socket(address.host(), address.getClientPort());
                 objectReader = new ObjectInputStream(socket.getInputStream());
