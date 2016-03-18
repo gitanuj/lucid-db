@@ -79,4 +79,12 @@ public class Utils {
         int position = index / clusterSize;
         return Config.SERVER_IPS.subList(position * clusterSize, position * clusterSize + clusterSize);
     }
+
+    public static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (Exception e) {
+            LogUtils.error(LOG_TAG, "Failed to sleep", e);
+        }
+    }
 }

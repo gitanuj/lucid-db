@@ -22,7 +22,15 @@ public class WriteCommand implements Command<Object> {
         return this.commands;
     }
 
-    public String getFirstKeyInThisCommand(){
+    public String getFirstKeyInThisCommand() {
         return commands.entrySet().iterator().next().getKey();
+    }
+
+    @Override
+    public String toString() {
+        return "WriteCommand{" +
+                "txn_id=" + txn_id +
+                ", commands=" + commands +
+                '}';
     }
 }

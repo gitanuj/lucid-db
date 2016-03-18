@@ -13,4 +13,11 @@ public class ReadQuery implements Query<String> {
     public String key() {
         return key;
     }
+
+    @Override
+    public String toString() {
+        return "ReadQuery{" +
+                "key='" + key + '\'' +
+                '}';
+    }
 }

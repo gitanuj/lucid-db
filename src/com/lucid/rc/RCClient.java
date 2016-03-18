@@ -22,7 +22,7 @@ public class RCClient implements YCSBClient {
         private boolean writeSuccessful;
         private long writeTxnId;
 
-        WriteFlags(){
+        WriteFlags() {
             this.writesReturned = 0;
             this.writeThreadsCounter = 0;
             this.writesWaitOneMe = new Object();
@@ -137,6 +137,7 @@ public class RCClient implements YCSBClient {
 
     @Override
     public String executeQuery(Query query) throws Exception {
+        LogUtils.debug(LOG_TAG, "Executing query: " + query);
 
         List<AddressConfig> queryShards = Utils.getReplicaClusterIPs(((ReadQuery) query).key());
         Thread[] clientRequests = new Thread[queryShards.size()];
@@ -174,6 +175,8 @@ public class RCClient implements YCSBClient {
 
     @Override
     public boolean executeCommand(Command command) throws Exception {
+        LogUtils.debug(LOG_TAG, "Executing command: " + command);
+
         if (command instanceof WriteCommand) {
             try {
                 // Select shard of first key in WriteCommand to be the coordinator for this transaction.
@@ -187,14 +190,14 @@ public class RCClient implements YCSBClient {
                 for (AddressConfig shard : coordinators) {
                     try {
                         clientRequests[writeFlags.getWriteThreadsCounter()] = new Thread(new CommandCluster(shard,
-                                (WriteCommand)command, writeFlags));
+                                (WriteCommand) command, writeFlags));
                         clientRequests[writeFlags.getWriteThreadsCounter()].start();
                         writeFlags.setWriteThreadsCounter(writeFlags.getWriteThreadsCounter() + 1);
                     } catch (Exception e) {
                         LogUtils.debug(LOG_TAG, "Transaction ID: " + writeFlags.getWriteTxnId() + ". Something " +
                                 "went wrong " +
                                 "while" +
-                                " starting thread number " + (writeFlags.getWriteThreadsCounter()- 1), e);
+                                " starting thread number " + (writeFlags.getWriteThreadsCounter() - 1), e);
                     }
                 }
 
@@ -279,10 +282,10 @@ public class RCClient implements YCSBClient {
                 readFlags.setHighestVersionRead(result.getFirst());
                 readFlags.setHighestVersionResult(result.getSecond());
             }
-            
+
             // If majority threads have returned, notify readsWaitOnMe object.
             if (readFlags.getReadsReturned() > (readFlags.getReadThreadsCounter() / 2))
-                synchronized (readFlags.getReadsWaitOnMe()){
+                synchronized (readFlags.getReadsWaitOnMe()) {
                     readFlags.getReadsWaitOnMe().notify();
                 }
         }
@@ -314,7 +317,7 @@ public class RCClient implements YCSBClient {
 
                 // Wait for response.
                 reader = new ObjectInputStream(socket.getInputStream());
-                result = (Pair<Long, String>)reader.readObject();
+                result = (Pair<Long, String>) reader.readObject();
                 LogUtils.debug(LOG_TAG, "Result for txn id " + writeFlags.getWriteTxnId() + " is " + result);
                 socket.close();
 
@@ -342,13 +345,13 @@ public class RCClient implements YCSBClient {
 
             // If majority threads have returned, set result and notify writesWaitOnMe object.
             if (writeFlags.getWritesReturned() > writeFlags.getWriteThreadsCounter() / 2) {
-                if (numberOfCommits > (writeFlags.getWriteThreadsCounter()/ 2))
+                if (numberOfCommits > (writeFlags.getWriteThreadsCounter() / 2))
                     writeFlags.setWriteSuccessful(true);
                 LogUtils.debug(LOG_TAG, "Number of data centres where transaction ID " + writeFlags.getWriteTxnId() +
                         " committed " +
                         "are " + numberOfCommits);
 
-                synchronized (writeFlags.getWritesWaitOneMe()){
+                synchronized (writeFlags.getWritesWaitOneMe()) {
                     writeFlags.getWritesWaitOneMe().notify();
                 }
             }
