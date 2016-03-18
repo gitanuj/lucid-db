@@ -256,6 +256,7 @@ public class RCClient implements YCSBClient {
                 socket = new Socket(server.host(), server.getClientPort());
                 ObjectOutputStream writer = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
                 writer.writeObject(new TransportObject(Config.TXN_ID_NOT_APPLICABLE, query.key()));
+                writer.flush();
 
                 // Wait for response.
                 ObjectInputStream reader = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
@@ -311,6 +312,7 @@ public class RCClient implements YCSBClient {
                 socket = new Socket(server.host(), server.getClientPort());
                 ObjectOutputStream writer = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
                 writer.writeObject(new TransportObject(command.getTxn_id(), command.getWriteCommands()));
+                writer.flush();
 
                 // Wait for response.
                 ObjectInputStream reader = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
