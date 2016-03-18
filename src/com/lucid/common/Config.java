@@ -10,12 +10,18 @@ public final class Config {
 
     private static final String LOG_TAG = "CONFIG";
 
+    private static boolean INIT = false;
+
     private Config() {
     }
 
-    public static void init() {
+    public synchronized static void init() {
+        if(INIT) {
+            return;
+        }
         try {
             Properties properties = new Gson().fromJson(new FileReader("lucid.config"), Properties.class);
+            SERVER_IPS = new ArrayList<>();
             for (AddressConfig addressConfig : properties.getAddressConfigs()) {
                 SERVER_IPS.add(addressConfig);
             }
@@ -34,6 +40,7 @@ public final class Config {
             DETERMINE_SPANNER_LEADER_PING_LATENCY = properties.getDETERMINE_SPANNER_LEADER_PING_LATENCY();
             LOCK_TABLE_SIZE = properties.getLockTableSize();
 
+            INIT = true;
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Failed to load config", e);
         }
@@ -41,7 +48,7 @@ public final class Config {
 
     public static final long TXN_ID_NOT_APPLICABLE = -1;
     public static int NUM_DATACENTERS;
-    public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
+    public static List<AddressConfig> SERVER_IPS;
     public static long READ_QUERY_TIMEOUT;
     public static long COMMAND_TIMEOUT;
     public static int SPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY;

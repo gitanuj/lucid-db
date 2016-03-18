@@ -152,19 +152,41 @@ public class RCServer {
     }
 
     private void acquireTxnLocks(ServerMsg msg) throws Exception {
-        List<Semaphore> lockList = new ArrayList<>();
-        txnLocks.put(msg.getTxn_id(), lockList);
-        for (String key : msg.getMap().keySet()) {
-            if (serverContainsKey(addressConfig, key)) {
-                Semaphore semaphore = stripedSemaphore.get(key);
-                semaphore.acquire();
-                lockList.add(semaphore);
+        List<Semaphore> lockList;
+        synchronized (txnLocks) {
+            lockList = txnLocks.get(msg.getTxn_id());
+            if (lockList == null) {
+                lockList = new ArrayList<>();
+                for (String key : msg.getMap().keySet()) {
+                    if (serverContainsKey(addressConfig, key)) {
+                        Semaphore semaphore = stripedSemaphore.get(key);
+                        lockList.add(semaphore);
+                    }
+                }
             }
+        }
+
+        for (Semaphore semaphore : lockList) {
+            semaphore.acquire();
         }
     }
 
     private void releaseTxnLocks(ServerMsg msg) throws Exception {
-        for (Semaphore semaphore : txnLocks.remove(msg.getTxn_id())) {
+        List<Semaphore> lockList;
+        synchronized (txnLocks) {
+            lockList = txnLocks.get(msg.getTxn_id());
+            if (lockList == null) {
+                lockList = new ArrayList<>();
+                for (String key : msg.getMap().keySet()) {
+                    if (serverContainsKey(addressConfig, key)) {
+                        Semaphore semaphore = stripedSemaphore.get(key);
+                        lockList.add(semaphore);
+                    }
+                }
+            }
+        }
+
+        for (Semaphore semaphore : lockList) {
             semaphore.release();
         }
     }
@@ -187,6 +209,10 @@ public class RCServer {
 
     // Only received by a coordinator
     private void handleAck2PCPrepare(ServerMsg msg) throws Exception {
+        if (!msg.getCoordinator().equals(addressConfig)) {
+            throw new Exception("Unexpected msg received: " + msg);
+        }
+
         // Let the coordinator know that ack is received
         ackLocks.get(msg.getTxn_id()).release();
     }
@@ -290,7 +316,6 @@ public class RCServer {
 
             Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
             outputStream.writeObject(value);
-            outputStream.flush();
         } else {
             // Write command
             ServerMsg serverMsg = new ServerMsg(null, msg.getKey(), msg.getWriteMap(), msg.getTxn_id(), addressConfig);
@@ -313,7 +338,6 @@ public class RCServer {
             Pair<Long, String> value = new Pair<>(msg.getTxn_id(), "COMMIT");
             Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
             outputStream.writeObject(value);
-            outputStream.flush();
 
             // Inform other coordinators
             ServerMsg ack2PCPrepare = new ServerMsg(serverMsg, Message._2PC_ACCEPT);
