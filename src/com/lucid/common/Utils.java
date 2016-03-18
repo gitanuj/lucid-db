@@ -24,9 +24,8 @@ public class Utils {
     }
 
     public static List<AddressConfig> getReplicaClusterIPs(Object key) {
-        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
-        int index = Math.abs(key.hashCode()) % Config.NUM_DATACENTERS;
-        return new ArrayList<>(Config.SERVER_IPS).subList(index * clusterSize, index * clusterSize + clusterSize);
+        int shardID = getShardID(key);
+        return getReplicaClusterIPs(shardID);
     }
 
     public static int getShardID(Object key) {

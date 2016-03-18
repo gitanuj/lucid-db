@@ -307,24 +307,27 @@ public class RCClient implements YCSBClient {
 
         @Override
         public void run() {
+            Socket socket = null;
             try {
-                Socket socket = new Socket(server.host(), server.getClientPort());
+                socket = new Socket(server.host(), server.getClientPort());
                 writer = new ObjectOutputStream(socket.getOutputStream());
 
                 // Simulate RC client to datacenter average latency, and write object to datacenter.
                 Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
                 writer.writeObject(new TransportObject(command.getTxn_id(), command.getWriteCommands()));
+                writer.flush();
 
                 // Wait for response.
                 reader = new ObjectInputStream(socket.getInputStream());
                 result = (Pair<Long, String>) reader.readObject();
                 LogUtils.debug(LOG_TAG, "Result for txn id " + writeFlags.getWriteTxnId() + " is " + result);
-                socket.close();
 
                 // Report to WriteMajoritySelector object.
                 writeFlags.getWriteMajoritySelector().threadReturned(result, writeFlags);
             } catch (Exception e) {
                 LogUtils.debug(LOG_TAG, "Error in talking to server.", e);
+            } finally {
+                Utils.closeQuietly(socket);
             }
         }
     }
