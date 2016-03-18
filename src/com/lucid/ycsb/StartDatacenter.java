@@ -25,7 +25,7 @@ public class StartDatacenter {
         List<Integer> indexes = Utils.getDatacenterIndexes(datacenterID);
 
         if ((Integer.parseInt(args[0])) == Config.SPANNER) {
-            LogUtils.debug("StartServers", "Starting Spanner cluster");
+            LogUtils.debug("StartServers", "Starting Spanner cluster of servers:" + indexes);
             for (int index : indexes) {
                 final int ind = index;
                 Utils.startThreadWithName(() -> {
