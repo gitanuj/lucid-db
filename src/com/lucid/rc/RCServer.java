@@ -124,7 +124,7 @@ public class RCServer {
                         releaseTxnLocks(msg);
                     }
                 } catch (Exception e) {
-                    LogUtils.error(LOG_TAG, "Failed to release locks for " + msg);
+                    LogUtils.error(LOG_TAG, "Failed to release locks for " + msg, e);
                 }
             }
         };
@@ -153,6 +153,13 @@ public class RCServer {
                 }
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Something went wrong in handle-server-msg thread", e);
+                try {
+                    if (msg != null && msg.getKey() != null) {
+                        releaseTxnLocks(msg);
+                    }
+                } catch (Exception ex) {
+                    LogUtils.error(LOG_TAG, "Failed to release locks for " + msg, ex);
+                }
             }
         };
 
@@ -174,7 +181,7 @@ public class RCServer {
         }
 
         for (Semaphore semaphore : lockList) {
-            semaphore.acquire();
+            semaphore.tryAcquire(Config.COMMAND_TIMEOUT / 2, TimeUnit.MILLISECONDS);
         }
     }
 
