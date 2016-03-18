@@ -15,7 +15,7 @@ public class Lucid {
 
     // Need this to init logging config
     private void init() {
-        LogUtils.init();
+        Config.init();
     }
 
     public void onClientStarted() {

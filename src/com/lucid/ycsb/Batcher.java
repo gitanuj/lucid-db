@@ -63,7 +63,9 @@ public class Batcher {
     public boolean write(WriteObject writeObject) {
         try {
             long txnId = addToBatch(writeObject);
+            LogUtils.debug(LOG_TAG, "Added to batch");
             waitToComplete(txnId);
+            LogUtils.debug(LOG_TAG, "Woke up to check result");
             return checkResult(txnId);
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Something went wrong while batching write", e);
