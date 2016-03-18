@@ -56,7 +56,7 @@ public class SpannerClient implements YCSBClient {
         // pairs of objects to commit in that cluster.
         HashMap<Integer, List<String>> sMap; // Maps cluster IDs to keys.
         Socket socket, coordinatorSocket = null;
-        ObjectInputStream objectReader;
+        ObjectInputStream objectReader = null;
         Scanner reader;
         AddressConfig coordinatorAddress = null;
         ObjectOutputStream writer;
@@ -177,8 +177,11 @@ public class SpannerClient implements YCSBClient {
         try {
             LogUtils.debug(LOG_TAG, "Waiting for response from coordinator " + coordinatorSocket.getInetAddress()
                     .getHostName() + ":" + coordinatorSocket.getPort());
-            reader = new Scanner(new InputStreamReader(coordinatorSocket.getInputStream()));
-            String result = reader.next();
+            //reader = new Scanner(new InputStreamReader(coordinatorSocket.getInputStream()));
+            //String result = reader.next();
+            ObjectInputStream objectCReader = new ObjectInputStream(coordinatorSocket.getInputStream());
+            String result = (String) objectCReader.readObject();
+
             LogUtils.debug(LOG_TAG, "Message received from coordinator: " + result + ". Commit cluster IDs at which " +
                     "commit was applied:");
             for (Map.Entry<Integer, List<String>> map : sMap.entrySet())

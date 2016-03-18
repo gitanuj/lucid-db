@@ -252,8 +252,7 @@ public class SpannerServer {
                 Address leaderAddress = server.cluster().leader().address();
                 AddressConfig leaderAddressConfig = null;
                 for (AddressConfig addrc : Config.SERVER_IPS) {
-                    Address addr = addrc.toAddress();
-                    if (addr.host().equals(leaderAddress.host()) && addr.port() == leaderAddress.port()) {
+                    if (addrc.host().equals(leaderAddress.socketAddress().getAddress().getHostAddress()) && addrc.port() == leaderAddress.port()) {
                         leaderAddressConfig = addrc;
                         break;
                     }
@@ -407,6 +406,8 @@ public class SpannerServer {
 
     private void send2PCMsgLeaders(SpannerUtils.SERVER_MSG msgType, long tid, List<Integer> indexList) {
         // Send to all Leaders
+        if(indexList == null)
+            return;
         for (int index : indexList) {
             String msg = msgType.toString() + ":" + tid + ":" + index;
             AddressConfig addr = Config.SERVER_IPS.get(index);
@@ -444,8 +445,11 @@ public class SpannerServer {
     private void send2PCMsgSingle(String msg, Socket socket) {
         //String msg = msgType.toString() + ":" + tid;
         try {
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            out.println(msg);
+            ObjectOutputStream writer = new ObjectOutputStream(socket.getOutputStream());
+            writer.writeObject(msg);
+
+            //PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            //out.println(msg);
             LogUtils.debug(LOG_TAG, "Sent 2PC Message " + msg + " to " +
                     socket.getInetAddress().getHostName() + ":" + socket.getPort());
         } catch (Exception e) {
