@@ -8,8 +8,8 @@
       java -cp lucid-db.jar com.lucid.ycsb.StartServers 1   -> for RCDB
     
     Each datacenter on same instance:
-      java -cp lucid-db.jar com.lucid.ycsb.StartServers 0   -> for SpannerDB     [or]
-      java -cp lucid-db.jar com.lucid.ycsb.StartServers 1   -> for RCDB
+      java -cp lucid-db.jar com.lucid.ycsb.StartDatacenter 0   -> for SpannerDB     [or]
+      java -cp lucid-db.jar com.lucid.ycsb.StartDatacenter 1   -> for RCDB
 
 * Start client as:
       java -cp lucid-db.jar com.yahoo.ycsb.Client -t -db com.lucid.ycsb.SpannerDB -P workloads/workloada    [or]
