@@ -111,7 +111,10 @@ public class SpannerServer {
                     Socket cohort = serverSocket.accept();
                     LogUtils.debug(LOG_TAG, "Received msg at ServerPort from:" +
                             cohort.getInetAddress() + cohort.getPort());
-                    handleServerAccept(cohort);
+                    Runnable serverHandler = () -> {
+                        handleServerAccept(cohort);
+                    };
+                    Utils.startThreadWithName(serverHandler, "server handler thread.");
                 }
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Exception in acceptServer thread.", e);
@@ -349,7 +352,7 @@ public class SpannerServer {
     private int getServerDelay(int index, AddressConfig coordPaxosAddr) {
         int delay = 0;
         int serverIndex = getServerIndex(coordPaxosAddr);
-        if(!isSameDataCenter(serverIndex, index)){
+        if (!isSameDataCenter(serverIndex, index)) {
             delay = Config.SPANNER_INTER_DATACENTER_LATENCY;
         }
         return delay;
@@ -357,7 +360,7 @@ public class SpannerServer {
 
     private int getServerDelay(int index1, int index2) {
         int delay = 0;
-        if(!isSameDataCenter(index1, index2)){
+        if (!isSameDataCenter(index1, index2)) {
             delay = Config.SPANNER_INTER_DATACENTER_LATENCY;
         }
         return delay;
@@ -365,7 +368,7 @@ public class SpannerServer {
 
     private boolean isSameDataCenter(int serverIndex, int index) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        return (index/clusterSize) == (serverIndex/clusterSize);
+        return (index / clusterSize) == (serverIndex / clusterSize);
     }
 
     /* After receiving PREPARE_ACKs from everyone, txn is ready for commit.
