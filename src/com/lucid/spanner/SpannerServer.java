@@ -51,7 +51,7 @@ public class SpannerServer {
 
         this.index = index;
         try {
-            this.host = addressConfig.host(); //InetAddress.getLocalHost().getHostName();
+            this.host = "127.0.0.1";//InetAddress.getLocalHost().getHostName();
         } catch (Exception e) {
             LogUtils.debug(LOG_TAG, "Cannot get hostname:", e);
         }
@@ -250,9 +250,17 @@ public class SpannerServer {
                 LogUtils.debug(LOG_TAG, "Client connected:" + client.getInetAddress() + ":" + client.getPort());
 
                 Address leaderAddress = server.cluster().leader().address();
+                AddressConfig leaderAddressConfig = null;
+                for (AddressConfig addrc : Config.SERVER_IPS) {
+                    Address addr = addrc.toAddress();
+                    if (addr.host().equals(leaderAddress.host()) && addr.port() == leaderAddress.port()) {
+                        leaderAddressConfig = addrc;
+                        break;
+                    }
+                }
 
                 ObjectOutputStream writer = new ObjectOutputStream(client.getOutputStream());
-                writer.writeObject(leaderAddress);
+                writer.writeObject(leaderAddressConfig);
 
                 // Send my role to the client
                 //PrintWriter out = new PrintWriter(client.getOutputStream(), true);
@@ -260,7 +268,7 @@ public class SpannerServer {
 
                 // If I am not leader, close connection, cleanup and exit.
                 if (!iAmLeader()) {
-                    LogUtils.debug(LOG_TAG, "Sent client msg that I am not leader. Closing connection.");
+                    LogUtils.debug(LOG_TAG, "Sent client msg that I am not leader and leader address. Closing connection.");
                     Utils.closeQuietly(client);
                     return;
                 }
