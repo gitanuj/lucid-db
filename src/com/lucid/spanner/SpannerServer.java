@@ -13,7 +13,6 @@ import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +50,7 @@ public class SpannerServer {
 
         this.index = index;
         try {
-            this.host = "127.0.0.1";//InetAddress.getLocalHost().getHostName();
+            this.host = InetAddress.getLocalHost().getHostName();
         } catch (Exception e) {
             LogUtils.debug(LOG_TAG, "Cannot get hostname:", e);
         }
@@ -406,7 +405,7 @@ public class SpannerServer {
 
     private void send2PCMsgLeaders(SpannerUtils.SERVER_MSG msgType, long tid, List<Integer> indexList) {
         // Send to all Leaders
-        if(indexList == null)
+        if (indexList == null)
             return;
         for (int index : indexList) {
             String msg = msgType.toString() + ":" + tid + ":" + index;

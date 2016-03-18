@@ -6,7 +6,6 @@ import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
 
-import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -99,8 +98,12 @@ public class SpannerClient implements YCSBClient {
                     return false;
                 }
 
-                // Connect to the leader.
-                socket = new Socket(leaderAddressForThisClusterId.host(), leaderAddressForThisClusterId.getClientPort());
+                if (!address.host().equals(leaderAddressForThisClusterId.host()) || !(address.port() == leaderAddressForThisClusterId.port())) {
+                    Utils.closeQuietly(socket);
+                    socket = new Socket(leaderAddressForThisClusterId.host(), leaderAddressForThisClusterId.getClientPort());
+                    objectReader = new ObjectInputStream(socket.getInputStream());
+                    leaderAddressForThisClusterId = (AddressConfig) objectReader.readObject();
+                }
 
                 // Choose coordinator.
                 if (coordinatorSocket == null) {
