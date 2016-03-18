@@ -2,7 +2,12 @@
 
 * 'lucid.config' should have internal IPs of the servers.
 
-* Start servers (all on same instance):
+* Start servers:
+    all on same instance:
+      java -cp lucid-db.jar com.lucid.ycsb.StartServers 0   -> for SpannerDB     [or]
+      java -cp lucid-db.jar com.lucid.ycsb.StartServers 1   -> for RCDB
+    
+    Each datacenter on same instance:
       java -cp lucid-db.jar com.lucid.ycsb.StartServers 0   -> for SpannerDB     [or]
       java -cp lucid-db.jar com.lucid.ycsb.StartServers 1   -> for RCDB
 
