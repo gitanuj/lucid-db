@@ -11,7 +11,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -24,7 +23,7 @@ public class SpannerClient implements YCSBClient {
     public SpannerClient() {
         Lucid.getInstance().onClientStarted();
         copycatClient = SpannerUtils.buildClient(SpannerUtils.toAddress(Config.SERVER_IPS));
-        copycatClient.open().join();
+        copycatClient.connect().join();
     }
 
     @Override
@@ -85,17 +84,17 @@ public class SpannerClient implements YCSBClient {
         // Determine leaders.
         for (Map.Entry entry : sMap.entrySet()) {
             int clusterId = (Integer) entry.getKey();
-            try{
+            try {
                 // Talk to the first server in this replica cluster asking for leader AddressConfig.
                 AddressConfig address = Utils.getReplicaClusterIPs(clusterId).get(0);
 
                 Thread.sleep(Config.DETERMINE_SPANNER_LEADER_PING_LATENCY);
                 socket = new Socket(address.host(), address.getClientPort());
                 objectReader = new ObjectInputStream(socket.getInputStream());
-                AddressConfig leaderAddressForThisClusterId = (AddressConfig)objectReader.readObject();
+                AddressConfig leaderAddressForThisClusterId = (AddressConfig) objectReader.readObject();
 
                 // If no leader found for this replica cluster, abort.
-                if(leaderAddressForThisClusterId == null){
+                if (leaderAddressForThisClusterId == null) {
                     LogUtils.debug(LOG_TAG, "Leader for cluster ID " + clusterId + " is null.");
                     return false;
                 }
@@ -114,8 +113,7 @@ public class SpannerClient implements YCSBClient {
                 LogUtils.debug(LOG_TAG, " Leader for Cluster ID " + clusterId + " is " +
                         leaderAddressForThisClusterId.host() + ":" + leaderAddressForThisClusterId.getClientPort());
                 sessionMap.put(clusterId, socket);
-            }
-            catch(Exception e){
+            } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Something went wrong", e);
             }
 
@@ -183,7 +181,7 @@ public class SpannerClient implements YCSBClient {
             String result = reader.next();
             LogUtils.debug(LOG_TAG, "Message received from coordinator: " + result + ". Commit cluster IDs at which " +
                     "commit was applied:");
-            for(Map.Entry<Integer, List<String>> map : sMap.entrySet())
+            for (Map.Entry<Integer, List<String>> map : sMap.entrySet())
                 System.out.println(map.getKey());
 
             System.out.println();
