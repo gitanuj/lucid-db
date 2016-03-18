@@ -10,17 +10,11 @@ import java.io.BufferedOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class RCClient implements YCSBClient {
 
     private static final String LOG_TAG = "RC_CLIENT";
-
-    private Map<AddressConfig, ObjectOutputStream> OOS_MAP = new HashMap<>();
-
-    private Map<AddressConfig, ObjectInputStream> OIS_MAP = new HashMap<>();
 
     private class WriteFlags {
         private int writesReturned;
@@ -143,18 +137,6 @@ public class RCClient implements YCSBClient {
 
     }
 
-    public RCClient() {
-        for (AddressConfig addressConfig : Config.SERVER_IPS) {
-            try {
-                Socket socket = new Socket(addressConfig.host(), addressConfig.getClientPort());
-                OOS_MAP.put(addressConfig, new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream())));
-                OIS_MAP.put(addressConfig, new ObjectInputStream(new BufferedInputStream(socket.getInputStream())));
-            } catch (Exception e) {
-                LogUtils.error(LOG_TAG, "Failed to create socket for " + addressConfig);
-            }
-        }
-    }
-
     @Override
     public String executeQuery(Query query) throws Exception {
         LogUtils.debug(LOG_TAG, "Executing query: " + query);
@@ -267,25 +249,24 @@ public class RCClient implements YCSBClient {
 
         @Override
         public void run() {
+            Socket socket = null;
             try {
                 // Simulate RC client to datacenter average latency, and write object to datacenter.
                 Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
-                ObjectOutputStream writer = OOS_MAP.get(server);
-                synchronized (writer) {
-                    writer.writeObject(new TransportObject(Config.TXN_ID_NOT_APPLICABLE, query.key()));
-                }
+                socket = new Socket(server.host(), server.getClientPort());
+                ObjectOutputStream writer = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+                writer.writeObject(new TransportObject(Config.TXN_ID_NOT_APPLICABLE, query.key()));
 
                 // Wait for response.
-                ObjectInputStream reader = OIS_MAP.get(server);
-                synchronized (reader) {
-                    result = (Pair<Long, String>) reader.readObject();
-                }
+                ObjectInputStream reader = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
+                result = (Pair<Long, String>) reader.readObject();
 
                 // Report to ReadMajoritySelector object.
                 readFlags.getReadMajoritySelector().threadReturned(result, readFlags);
             } catch (Exception e) {
-                e.printStackTrace();
                 LogUtils.debug(LOG_TAG, "Something went wrong.", e);
+            } finally {
+                Utils.closeQuietly(socket);
             }
         }
     }
@@ -323,25 +304,25 @@ public class RCClient implements YCSBClient {
 
         @Override
         public void run() {
+            Socket socket = null;
             try {
                 // Simulate RC client to datacenter average latency, and write object to datacenter.
                 Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
-                ObjectOutputStream writer = OOS_MAP.get(server);
-                synchronized (writer) {
-                    writer.writeObject(new TransportObject(command.getTxn_id(), command.getWriteCommands()));
-                }
+                socket = new Socket(server.host(), server.getClientPort());
+                ObjectOutputStream writer = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+                writer.writeObject(new TransportObject(command.getTxn_id(), command.getWriteCommands()));
 
                 // Wait for response.
-                ObjectInputStream reader = OIS_MAP.get(server);
-                synchronized (reader) {
-                    result = (Pair<Long, String>) reader.readObject();
-                }
+                ObjectInputStream reader = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
+                result = (Pair<Long, String>) reader.readObject();
                 LogUtils.debug(LOG_TAG, "Result for txn id " + writeFlags.getWriteTxnId() + " is " + result);
 
                 // Report to WriteMajoritySelector object.
                 writeFlags.getWriteMajoritySelector().threadReturned(result, writeFlags);
             } catch (Exception e) {
                 LogUtils.debug(LOG_TAG, "Error in talking to server.", e);
+            } finally {
+                Utils.closeQuietly(socket);
             }
         }
     }
