@@ -152,19 +152,41 @@ public class RCServer {
     }
 
     private void acquireTxnLocks(ServerMsg msg) throws Exception {
-        List<Semaphore> lockList = new ArrayList<>();
-        txnLocks.put(msg.getTxn_id(), lockList);
-        for (String key : msg.getMap().keySet()) {
-            if (serverContainsKey(addressConfig, key)) {
-                Semaphore semaphore = stripedSemaphore.get(key);
-                semaphore.acquire();
-                lockList.add(semaphore);
+        List<Semaphore> lockList;
+        synchronized (txnLocks) {
+            lockList = txnLocks.get(msg.getTxn_id());
+            if (lockList == null) {
+                lockList = new ArrayList<>();
+                for (String key : msg.getMap().keySet()) {
+                    if (serverContainsKey(addressConfig, key)) {
+                        Semaphore semaphore = stripedSemaphore.get(key);
+                        lockList.add(semaphore);
+                    }
+                }
             }
+        }
+
+        for (Semaphore semaphore : lockList) {
+            semaphore.acquire();
         }
     }
 
     private void releaseTxnLocks(ServerMsg msg) throws Exception {
-        for (Semaphore semaphore : txnLocks.remove(msg.getTxn_id())) {
+        List<Semaphore> lockList;
+        synchronized (txnLocks) {
+            lockList = txnLocks.get(msg.getTxn_id());
+            if (lockList == null) {
+                lockList = new ArrayList<>();
+                for (String key : msg.getMap().keySet()) {
+                    if (serverContainsKey(addressConfig, key)) {
+                        Semaphore semaphore = stripedSemaphore.get(key);
+                        lockList.add(semaphore);
+                    }
+                }
+            }
+        }
+
+        for (Semaphore semaphore : lockList) {
             semaphore.release();
         }
     }
