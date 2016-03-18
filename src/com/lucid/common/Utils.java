@@ -42,14 +42,11 @@ public class Utils {
     }
 
     public static List<AddressConfig> getDatacenterIPs(int index) {
-        if (Config.NUM_CLUSTERS == 1) {
-            return Config.SERVER_IPS;
-        }
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         int offset = index % clusterSize;
 
         List<AddressConfig> list = new ArrayList<>();
-        for (int i = offset; i < Config.SERVER_IPS.size(); i += clusterSize) {
+        for (int i = offset; i < Config.SERVER_IPS.size(); i += Config.NUM_CLUSTERS) {
             list.add(Config.SERVER_IPS.get(i));
         }
         return list;
@@ -57,13 +54,6 @@ public class Utils {
 
     public static List<Integer> getDatacenterIndexes(int datacenterID) {
         List<Integer> list = new ArrayList<>();
-        if (Config.NUM_CLUSTERS == 1) {
-            int size = Config.SERVER_IPS.size();
-            for (int i = 0; i < size; i++){
-                list.add(i);
-            }
-            return list;
-        }
 
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
         int offset = datacenterID % clusterSize;

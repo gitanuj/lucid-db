@@ -368,7 +368,7 @@ public class SpannerServer {
 
     private boolean isSameDataCenter(int serverIndex, int index) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        return (index / clusterSize) == (serverIndex / clusterSize);
+        return (index % clusterSize) == (serverIndex % clusterSize);
     }
 
     /* After receiving PREPARE_ACKs from everyone, txn is ready for commit.
