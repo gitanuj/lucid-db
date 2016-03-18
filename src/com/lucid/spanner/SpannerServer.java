@@ -51,8 +51,8 @@ public class SpannerServer {
 
         this.index = index;
         try {
-            this.host = InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
+            this.host = addressConfig.host(); //InetAddress.getLocalHost().getHostName();
+        } catch (Exception e) {
             LogUtils.debug(LOG_TAG, "Cannot get hostname:", e);
         }
         this.serverPort = addressConfig.getServerPort();
@@ -70,7 +70,7 @@ public class SpannerServer {
         startPaxosCluster();
 
         this.copycatClient = SpannerUtils.buildClient(SpannerUtils.toAddress(paxosMembers));
-        this.copycatClient.open().join();
+        this.copycatClient.connect().join();
 
         // Start server accept thread
         acceptServers();
@@ -99,7 +99,7 @@ public class SpannerServer {
         });
         server.serializer().disableWhitelist();
 
-        server.open().join();
+        server.start().join();
         LogUtils.debug(LOG_TAG, "Started SpannerServer at:" + host + ":" + paxosPort);
     }
 

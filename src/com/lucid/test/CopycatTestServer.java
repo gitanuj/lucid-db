@@ -36,9 +36,9 @@ public class CopycatTestServer {
 
         server.serializer().disableWhitelist();
 
-        server.open().join();
+        server.start().join();
 
-        if(index==0) {
+        if (index == 0) {
             System.out.println("\nStarting client............\n");
             Runnable clientRunnable = () -> {
                 try {
@@ -51,7 +51,7 @@ public class CopycatTestServer {
                             .build();
                     client.serializer().disableWhitelist();
 
-                    client.open().join();
+                    client.connect().join();
 
                     client.submit(new PutCommand("foo", "Hello world!")).get(5, TimeUnit.SECONDS);
 

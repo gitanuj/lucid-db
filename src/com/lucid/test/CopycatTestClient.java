@@ -25,7 +25,7 @@ public class CopycatTestClient {
                 .build();
         client.serializer().disableWhitelist();
 
-        client.open().join();
+        client.connect().join();
 
         client.submit(new PutCommand("foo", "Hello world!")).get(5, TimeUnit.SECONDS);
 
