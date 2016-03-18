@@ -108,16 +108,24 @@ public class RCServer {
 
     private void readServerMsg(Socket server) {
         Runnable runnable = () -> {
+            ServerMsg msg = null;
             try {
                 ObjectInputStream inputStream = new ObjectInputStream(server.getInputStream());
                 while (true) {
-                    ServerMsg msg = (ServerMsg) inputStream.readObject();
+                    msg = (ServerMsg) inputStream.readObject();
                     handleServerMsg(msg);
                 }
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Something went wrong in read-server-msg thread", e);
             } finally {
                 Utils.closeQuietly(server);
+                try {
+                    if (msg != null && msg.getKey() != null) {
+                        releaseTxnLocks(msg);
+                    }
+                } catch (Exception e) {
+                    LogUtils.error(LOG_TAG, "Failed to release locks for " + msg);
+                }
             }
         };
 
