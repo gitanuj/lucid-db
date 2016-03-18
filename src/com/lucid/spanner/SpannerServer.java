@@ -30,6 +30,7 @@ public class SpannerServer {
     private int clientPort;
     private int serverPort;
     private int paxosPort;
+    private CopycatServer server;
 
     private Map<Long, List<Semaphore>> lockMap;
 
@@ -85,7 +86,7 @@ public class SpannerServer {
         paxosMembers = Utils.getReplicaIPs(index);
         LogUtils.debug(LOG_TAG, "Starting SpannerServer at:" + host + " with members:" + paxosMembers);
 
-        CopycatServer server = CopycatServer.builder(selfPaxosAddress, SpannerUtils.toAddress(paxosMembers))
+        server = CopycatServer.builder(selfPaxosAddress, SpannerUtils.toAddress(paxosMembers))
                 .withTransport(new NettyTransport())
                 .withStateMachine(SpannerStateMachine::new)
                 .withStorage(Storage.builder().withStorageLevel(StorageLevel.MEMORY).
@@ -247,14 +248,20 @@ public class SpannerServer {
             TransportObject transportObject = null;
             try {
                 LogUtils.debug(LOG_TAG, "Client connected:" + client.getInetAddress() + ":" + client.getPort());
+
+                Address leaderAddress = server.cluster().leader().address();
+
+                ObjectOutputStream writer = new ObjectOutputStream(client.getOutputStream());
+                writer.writeObject(leaderAddress);
+
                 // Send my role to the client
-                PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-                out.println(iAmLeader() ? "1" : "0");
+                //PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+                //out.println(iAmLeader() ? "1" : "0");
 
                 // If I am not leader, close connection, cleanup and exit.
                 if (!iAmLeader()) {
                     LogUtils.debug(LOG_TAG, "Sent client msg that I am not leader. Closing connection.");
-                    com.lucid.common.Utils.closeQuietly(client);
+                    Utils.closeQuietly(client);
                     return;
                 }
 
@@ -314,13 +321,7 @@ public class SpannerServer {
             } finally {
                 if (transportObject != null && transportObject.isCoordinator())
                     tryReleaseLocks(tid);
-                if (client != null) {
-                    try {
-                        client.close();
-                    } catch (Exception e) {
-                        LogUtils.error(LOG_TAG, "Exception while closing client.", e);
-                    }
-                }
+                Utils.closeQuietly(client);
             }
         };
         Utils.startThreadWithName(clientRunnable, "Client Handling thread for client:" + client.getInetAddress());
