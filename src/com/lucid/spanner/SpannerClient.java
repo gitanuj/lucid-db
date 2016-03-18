@@ -30,6 +30,7 @@ public class SpannerClient implements YCSBClient {
 
         // Simulate Spanner client to closest datacenter latency, and write object to datacenter.
         Thread.sleep(Config.SPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY);
+        Thread.sleep(Config.SPANNER_INTER_DATACENTER_LATENCY);
         return (String) copycatClient.submit(query).get(Config.READ_QUERY_TIMEOUT, TimeUnit.MILLISECONDS);
     }
 
