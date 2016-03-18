@@ -19,8 +19,7 @@ public class Utils {
     }
 
     public static List<AddressConfig> getReplicaIPs(int index) {
-        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
-        int shardID = index / numShards;
+        int shardID = index / Config.NUM_DATACENTERS;
         return getReplicaClusterIPs(shardID);
     }
 
@@ -37,8 +36,7 @@ public class Utils {
     }
 
     public static List<AddressConfig> getReplicaClusterIPs(int shardID) {
-        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
-        return Config.SERVER_IPS.subList(shardID * numShards, shardID * numShards + Config.NUM_DATACENTERS);
+        return Config.SERVER_IPS.subList(shardID * Config.NUM_DATACENTERS, shardID * Config.NUM_DATACENTERS + Config.NUM_DATACENTERS);
     }
 
     public static Thread startThreadWithName(Runnable runnable, String name) {
@@ -49,12 +47,10 @@ public class Utils {
     }
 
     public static int getDatacenterID(int index) {
-        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
-        return index % numShards;
+        return index % Config.NUM_DATACENTERS;
     }
 
     public static List<AddressConfig> getDatacenterIPs(int index) {
-        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
         int datacenterID = getDatacenterID(index);
 
         List<AddressConfig> list = new ArrayList<>();
@@ -68,7 +64,7 @@ public class Utils {
         List<Integer> list = new ArrayList<>();
         int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
         for (int i = 0; i < numShards; ++i) {
-            list.add(datacenterID + i * numShards);
+            list.add(datacenterID + i * Config.NUM_DATACENTERS);
         }
         return list;
     }
