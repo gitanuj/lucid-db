@@ -11,7 +11,7 @@ public class LogUtils {
 
     private static final LogLevel LOG_LEVEL = LogLevel.DEBUG;
 
-    private static final boolean ENABLE_COPYCAT_DEBUG_LOGS = false;
+    private static boolean ENABLE_COPYCAT_DEBUG_LOGS = false;
 
     private static final Logger LOGGER = new PrintLogger();
 
@@ -20,6 +20,11 @@ public class LogUtils {
     }
 
     static {
+        setEnableCopycatDebugLogs(ENABLE_COPYCAT_DEBUG_LOGS);
+    }
+
+    public static void setEnableCopycatDebugLogs(boolean enableCopycatDebugLogs) {
+        ENABLE_COPYCAT_DEBUG_LOGS = enableCopycatDebugLogs;
         if (ENABLE_COPYCAT_DEBUG_LOGS) {
             setSL4JLoggingLevel(Level.DEBUG);
         } else {
