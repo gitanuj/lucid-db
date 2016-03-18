@@ -18,20 +18,27 @@ public class Utils {
         }
     }
 
+    public static List<AddressConfig> getReplicaIPs(int index) {
+        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
+        int shardID = index / numShards;
+        return getReplicaClusterIPs(shardID);
+    }
+
     public static List<AddressConfig> getReplicaClusterIPs(Object key) {
-        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
+        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
+        int index = Math.abs(key.hashCode()) % Config.NUM_DATACENTERS;
         return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 
-    public static int getReplicaClusterID(Object key) {
-        int index = Math.abs(key.hashCode()) % Config.NUM_CLUSTERS;
+    public static int getShardID(Object key) {
+        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
+        int index = Math.abs(key.hashCode()) % numShards;
         return index;
     }
 
-    public static List<AddressConfig> getReplicaClusterIPs(int index) {
-        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
+    public static List<AddressConfig> getReplicaClusterIPs(int shardID) {
+        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
+        return Config.SERVER_IPS.subList(shardID * numShards, shardID * numShards + Config.NUM_DATACENTERS);
     }
 
     public static Thread startThreadWithName(Runnable runnable, String name) {
@@ -41,12 +48,17 @@ public class Utils {
         return thread;
     }
 
+    public static int getDatacenterID(int index) {
+        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
+        return index % numShards;
+    }
+
     public static List<AddressConfig> getDatacenterIPs(int index) {
-        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        int offset = index % clusterSize;
+        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
+        int datacenterID = getDatacenterID(index);
 
         List<AddressConfig> list = new ArrayList<>();
-        for (int i = offset; i < Config.SERVER_IPS.size(); i += clusterSize) {
+        for (Integer i : getDatacenterIndexes(datacenterID)) {
             list.add(Config.SERVER_IPS.get(i));
         }
         return list;
@@ -54,20 +66,11 @@ public class Utils {
 
     public static List<Integer> getDatacenterIndexes(int datacenterID) {
         List<Integer> list = new ArrayList<>();
-
-        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        int offset = datacenterID % clusterSize;
-
-        for (int i = offset; i < Config.SERVER_IPS.size(); i += clusterSize) {
-            list.add(i);
+        int numShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
+        for (int i = 0; i < numShards; ++i) {
+            list.add(datacenterID + i * numShards);
         }
         return list;
-    }
-
-    public static List<AddressConfig> getReplicaIPs(int index) {
-        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS; // Note: Assuming equal-sized clusters
-        int position = index / clusterSize;
-        return Config.SERVER_IPS.subList(position * clusterSize, position * clusterSize + clusterSize);
     }
 
     public static void sleepQuietly(long millis) {
@@ -76,5 +79,13 @@ public class Utils {
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Failed to sleep", e);
         }
+    }
+
+    public static <T> void printList(List<T> list) {
+        System.out.println("---list---");
+        for (T item : list) {
+            System.out.println(item);
+        }
+        System.out.println("------");
     }
 }
