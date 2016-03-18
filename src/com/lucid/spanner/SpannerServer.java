@@ -319,7 +319,8 @@ public class SpannerServer {
                     AddressConfig coordPaxosAddr = (AddressConfig) transportObject.getCoordinator();
                     // Get corresponding server port
                     String msg = SpannerUtils.SERVER_MSG.PREPARE_ACK.toString() + ":" + tid + ":" + index;
-                    send2PCMsgSingle(msg, coordPaxosAddr.host(), coordPaxosAddr.getServerPort());
+                    int delay = getServerDelay(index, coordPaxosAddr);
+                    send2PCMsgSingle(msg, coordPaxosAddr.host(), coordPaxosAddr.getServerPort(), delay);
                 }
 
             } catch (Exception e) {
@@ -331,6 +332,40 @@ public class SpannerServer {
             }
         };
         Utils.startThreadWithName(clientRunnable, "Client Handling thread for client:" + client.getInetAddress());
+    }
+
+    private int getServerIndex(AddressConfig addressConfig) {
+        int serverIndex = -1;
+        for (AddressConfig addr : Config.SERVER_IPS) {
+            serverIndex++;
+            if (addr.host() == addressConfig.host() && addr.getServerPort() == addressConfig.getServerPort()) {
+                break;
+            }
+        }
+        return serverIndex;
+    }
+
+
+    private int getServerDelay(int index, AddressConfig coordPaxosAddr) {
+        int delay = 0;
+        int serverIndex = getServerIndex(coordPaxosAddr);
+        if(!isSameDataCenter(serverIndex, index)){
+            delay = Config.SPANNER_INTER_DATACENTER_LATENCY;
+        }
+        return delay;
+    }
+
+    private int getServerDelay(int index1, int index2) {
+        int delay = 0;
+        if(!isSameDataCenter(index1, index2)){
+            delay = Config.SPANNER_INTER_DATACENTER_LATENCY;
+        }
+        return delay;
+    }
+
+    private boolean isSameDataCenter(int serverIndex, int index) {
+        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
+        return (index/clusterSize) == (serverIndex/clusterSize);
     }
 
     /* After receiving PREPARE_ACKs from everyone, txn is ready for commit.
@@ -349,7 +384,7 @@ public class SpannerServer {
         LogUtils.debug(LOG_TAG, "Sending 2PC COMMIT message to client and other leaders.");
         // send COMMIT to client
         String msg = SpannerUtils.SERVER_MSG.COMMIT.toString() + ":" + tid;
-        send2PCMsgSingle(msg, client);
+        send2PCMsgSingle(msg, client, Config.SPANNER_INTER_DATACENTER_LATENCY);
 
         // Send 2PC commit to other leaders.
         send2PCMsgLeaders(SpannerUtils.SERVER_MSG.COMMIT, tid, leaders.get(tid));
@@ -374,7 +409,7 @@ public class SpannerServer {
         LogUtils.debug(LOG_TAG, "Sending 2PC ABORTs to client and other leaders.");
         // send COMMIT to client
         String msg = SpannerUtils.SERVER_MSG.ABORT.toString() + ":" + tid;
-        send2PCMsgSingle(msg, client);
+        send2PCMsgSingle(msg, client, Config.SPANNER_INTER_DATACENTER_LATENCY);
 
         // Send 2PC abort to other leaders.
         send2PCMsgLeaders(SpannerUtils.SERVER_MSG.ABORT, tid, leaders.get(tid));
@@ -411,7 +446,8 @@ public class SpannerServer {
             String msg = msgType.toString() + ":" + tid + ":" + index;
             AddressConfig addr = Config.SERVER_IPS.get(index);
             try {
-                send2PCMsgSingle(msg, addr.host(), addr.getServerPort());
+                int delay = getServerDelay(index, this.index);
+                send2PCMsgSingle(msg, addr.host(), addr.getServerPort(), delay);
             } catch (Exception e) {
                 LogUtils.error(LOG_TAG, "Exception during sending 2PC msg:", e);
             }
@@ -419,13 +455,14 @@ public class SpannerServer {
     }
 
 
-    private void send2PCMsgSingle(String msg, String host, int port) {
+    private void send2PCMsgSingle(String msg, String host, int port, int delay) {
         //String msg = msgType.toString() + ":" + tid;
         Socket socket = null;
         try {
             socket = new Socket(host, port);
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            out.println(msg);
+            ObjectOutputStream writer = new ObjectOutputStream(socket.getOutputStream());
+            Thread.sleep(delay);
+            writer.writeObject(msg);
             LogUtils.debug(LOG_TAG, "Sent 2PC Message " + msg + " to " +
                     socket.getInetAddress().getHostName() + ":" + socket.getPort());
         } catch (Exception e) {
@@ -441,14 +478,12 @@ public class SpannerServer {
         }
     }
 
-    private void send2PCMsgSingle(String msg, Socket socket) {
+    private void send2PCMsgSingle(String msg, Socket socket, int delay) {
         //String msg = msgType.toString() + ":" + tid;
         try {
             ObjectOutputStream writer = new ObjectOutputStream(socket.getOutputStream());
+            Thread.sleep(delay);
             writer.writeObject(msg);
-
-            //PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            //out.println(msg);
             LogUtils.debug(LOG_TAG, "Sent 2PC Message " + msg + " to " +
                     socket.getInetAddress().getHostName() + ":" + socket.getPort());
         } catch (Exception e) {
