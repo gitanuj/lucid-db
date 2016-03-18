@@ -4,7 +4,7 @@ import java.util.List;
 
 public class Properties {
 
-    private int numClusters;
+    private int numDatacenters;
 
     private List<AddressConfig> addressConfigs;
 
@@ -48,8 +48,8 @@ public class Properties {
         return INTRA_DATACENTER_LATENCY;
     }
 
-    public int getNumClusters() {
-        return numClusters;
+    public int getNumDatacenters() {
+        return numDatacenters;
     }
 
     public int getLockTableSize() {

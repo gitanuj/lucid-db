@@ -58,9 +58,6 @@ public class LogUtils {
         void error(String message);
     }
 
-    public static void init() {
-    }
-
     public static void setCopycatLogLevel(LogLevel logLevel) {
         COPYCAT_LOG_LEVEL = logLevel;
 

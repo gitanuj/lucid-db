@@ -1,7 +1,9 @@
 package com.lucid.ycsb;
 
+import com.lucid.common.AddressConfig;
 import com.lucid.common.Config;
 import com.lucid.common.LogUtils;
+import com.lucid.common.Utils;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.RandomByteIterator;
 import com.yahoo.ycsb.Status;
@@ -17,14 +19,23 @@ public class YCSBTester {
     private static final List<Thread> THREADS = new ArrayList<>();
 
     public static void main(String[] args) {
-        startTest(Integer.parseInt(args[0]), Integer.parseInt(args[1]));
+        Config.init();
+//        startTest(Integer.parseInt(args[0]), Integer.parseInt(args[1]));
+        startUtilsTest();
+    }
+
+    private static void startUtilsTest() {
+        for (int i = 0; i < Config.SERVER_IPS.size(); ++i) {
+            List<AddressConfig> datacenterIPs = Utils.getReplicaIPs(i);
+            Utils.printList(datacenterIPs);
+        }
     }
 
     private static void startTest(int numberOfThreads, int protocol) {
         Config.init();
 
         YCSBDB ycsbdb;
-        if(protocol == Config.SPANNER) ycsbdb = new SpannerDB();
+        if (protocol == Config.SPANNER) ycsbdb = new SpannerDB();
         else ycsbdb = new RCDB();
 
         for (int i = 0; i < numberOfThreads; i++) {

@@ -67,7 +67,7 @@ public class SpannerClient implements YCSBClient {
 
         // Accumulate keys mapped to the same clusters.
         for (Map.Entry entry : commands.entrySet()) {
-            int clusterId = Utils.getReplicaClusterID(entry.getKey());
+            int clusterId = Utils.getShardID(entry.getKey());
             List<String> list = sMap.get(clusterId);
             if (list == null) {
                 list = new ArrayList<>();

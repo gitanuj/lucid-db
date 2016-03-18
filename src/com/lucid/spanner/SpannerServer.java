@@ -367,8 +367,7 @@ public class SpannerServer {
     }
 
     private boolean isSameDataCenter(int serverIndex, int index) {
-        int clusterSize = Config.SERVER_IPS.size() / Config.NUM_CLUSTERS;
-        return (index % clusterSize) == (serverIndex % clusterSize);
+        return Utils.getDatacenterID(serverIndex) == Utils.getDatacenterID(index);
     }
 
     /* After receiving PREPARE_ACKs from everyone, txn is ready for commit.
@@ -575,7 +574,7 @@ class TState {
     CSTATE commit;
 
     public TState() {
-        numOtherShards = Config.NUM_CLUSTERS - 1;
+        numOtherShards = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS - 1;
         prepareCount = new Semaphore(0);
         commit = CSTATE.UNKNOWN;
     }
