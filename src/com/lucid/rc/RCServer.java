@@ -290,6 +290,7 @@ public class RCServer {
 
             Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
             outputStream.writeObject(value);
+            outputStream.flush();
         } else {
             // Write command
             ServerMsg serverMsg = new ServerMsg(null, msg.getKey(), msg.getWriteMap(), msg.getTxn_id(), addressConfig);
@@ -297,9 +298,9 @@ public class RCServer {
             // Send 2PC PREPARE to shards within datacenter
             ServerMsg _2PCPrepare = new ServerMsg(serverMsg, Message._2PC_PREPARE);
             Set<AddressConfig> datacenterIPs = getDatacenterIPsFor(msg.getWriteMap());
+            Thread.sleep(Config.INTRA_DATACENTER_LATENCY);
             for (AddressConfig config : datacenterIPs) {
                 ObjectOutputStream oos = datacenterOutputStreams.get(config);
-                Thread.sleep(Config.INTRA_DATACENTER_LATENCY);
                 synchronized (oos) {
                     oos.writeObject(_2PCPrepare);
                 }
@@ -312,6 +313,7 @@ public class RCServer {
             Pair<Long, String> value = new Pair<>(msg.getTxn_id(), "COMMIT");
             Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
             outputStream.writeObject(value);
+            outputStream.flush();
 
             // Inform other coordinators
             ServerMsg ack2PCPrepare = new ServerMsg(serverMsg, Message._2PC_ACCEPT);
