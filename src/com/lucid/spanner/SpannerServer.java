@@ -435,6 +435,7 @@ public class SpannerServer {
 
         try {
             LogUtils.debug(LOG_TAG, "Paxos Replication. Creating Client.");
+            Thread.sleep(Config.SPANNER_INTER_DATACENTER_LATENCY);
             copycatClient.submit(command).get(Config.COMMAND_TIMEOUT, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception while replicating Command:" + command, e);
