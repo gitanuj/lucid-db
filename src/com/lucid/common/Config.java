@@ -41,7 +41,7 @@ public final class Config {
 
     public static final long TXN_ID_NOT_APPLICABLE = -1;
     public static int NUM_DATACENTERS;
-    public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
+    public static List<AddressConfig> SERVER_IPS;
     public static long READ_QUERY_TIMEOUT;
     public static long COMMAND_TIMEOUT;
     public static int SPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY;

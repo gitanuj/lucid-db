@@ -26,7 +26,7 @@ public class Utils {
     public static List<AddressConfig> getReplicaClusterIPs(Object key) {
         int clusterSize = Config.SERVER_IPS.size() / Config.NUM_DATACENTERS;
         int index = Math.abs(key.hashCode()) % Config.NUM_DATACENTERS;
-        return Config.SERVER_IPS.subList(index * clusterSize, index * clusterSize + clusterSize);
+        return new ArrayList<>(Config.SERVER_IPS).subList(index * clusterSize, index * clusterSize + clusterSize);
     }
 
     public static int getShardID(Object key) {
@@ -36,7 +36,7 @@ public class Utils {
     }
 
     public static List<AddressConfig> getReplicaClusterIPs(int shardID) {
-        return Config.SERVER_IPS.subList(shardID * Config.NUM_DATACENTERS, shardID * Config.NUM_DATACENTERS + Config.NUM_DATACENTERS);
+        return new ArrayList<>(Config.SERVER_IPS).subList(shardID * Config.NUM_DATACENTERS, shardID * Config.NUM_DATACENTERS + Config.NUM_DATACENTERS);
     }
 
     public static Thread startThreadWithName(Runnable runnable, String name) {
