@@ -39,6 +39,8 @@ public final class Config {
             NUM_CLUSTERS = properties.getNumClusters();
             READ_QUERY_TIMEOUT = properties.getReadQueryTimeout();
             COMMAND_TIMEOUT = properties.getCommandTimeout();
+            LogUtils.setCopycatLogLevel(properties.getCOPYCAT_LOG_LEVEL());
+            LogUtils.setLucidLogLevel(properties.getLUCID_LOG_LEVEL());
 
             SPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY = properties.getSPANNER_CLIENT_TO_CLOSEST_DATACENTER_LATENCY();
             SPANNER_INTER_DATACENTER_LATENCY = properties.getSPANNER_INTER_DATACENTER_LATENCY();

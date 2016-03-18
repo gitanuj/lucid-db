@@ -187,10 +187,6 @@ public class SpannerClient implements YCSBClient {
 
             LogUtils.debug(LOG_TAG, "Message received from coordinator: " + result + ". Commit cluster IDs at which " +
                     "commit was applied:");
-            for (Map.Entry<Integer, List<String>> map : sMap.entrySet())
-                System.out.println(map.getKey());
-
-            System.out.println();
 
             return result.startsWith("COMMIT");
         } catch (Exception e) {

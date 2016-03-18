@@ -18,7 +18,8 @@ public class Properties {
     private int RC_INTER_DATACENTER_LATENCY;
     private int INTRA_DATACENTER_LATENCY;
     private int DETERMINE_SPANNER_LEADER_PING_LATENCY;
-    private boolean ENABLE_COPYCAT_DEBUG_LOGS;
+    private int COPYCAT_LOG_LEVEL;
+    private int LUCID_LOG_LEVEL;
 
     private int LOCK_TABLE_SIZE;
 
@@ -67,7 +68,11 @@ public class Properties {
         return commandTimeout;
     }
 
-    public boolean isENABLE_COPYCAT_DEBUG_LOGS() {
-        return ENABLE_COPYCAT_DEBUG_LOGS;
+    public LogUtils.LogLevel getCOPYCAT_LOG_LEVEL() {
+        return LogUtils.LogLevel.getLogLevelById(COPYCAT_LOG_LEVEL);
+    }
+
+    public LogUtils.LogLevel getLUCID_LOG_LEVEL() {
+        return LogUtils.LogLevel.getLogLevelById(LUCID_LOG_LEVEL);
     }
 }

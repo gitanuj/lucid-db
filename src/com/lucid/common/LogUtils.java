@@ -3,32 +3,43 @@ package com.lucid.common;
 import ch.qos.logback.classic.Level;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 public class LogUtils {
 
     private static final String LOG_PREFIX = "[lucid-db] ";
 
-    private static final LogLevel LOG_LEVEL = LogLevel.DEBUG;
+    private static LogLevel COPYCAT_LOG_LEVEL;
 
-    private static boolean ENABLE_COPYCAT_DEBUG_LOGS = false;
+    private static LogLevel LUCID_LOG_LEVEL;
 
-    private static final Logger LOGGER = new PrintLogger();
+    private static Logger LOGGER;
 
-    private enum LogLevel {
-        ERROR, WARN, DEBUG
-    }
+    public enum LogLevel {
+        NONE(0), ERROR(1), WARN(2), DEBUG(3);
 
-    static {
-        setEnableCopycatDebugLogs(ENABLE_COPYCAT_DEBUG_LOGS);
-    }
+        private static Map<Integer, LogLevel> MAP = new HashMap<>();
 
-    public static void setEnableCopycatDebugLogs(boolean enableCopycatDebugLogs) {
-        ENABLE_COPYCAT_DEBUG_LOGS = enableCopycatDebugLogs;
-        if (ENABLE_COPYCAT_DEBUG_LOGS) {
-            setSL4JLoggingLevel(Level.DEBUG);
-        } else {
-            setSL4JLoggingLevel(Level.ERROR);
+        static {
+            for (LogLevel logLevel : LogLevel.values()) {
+                MAP.put(logLevel.getId(), logLevel);
+            }
+        }
+
+        private int id;
+
+        LogLevel(int id) {
+            this.id = id;
+        }
+
+        public int getId() {
+            return this.id;
+        }
+
+        public static LogLevel getLogLevelById(int id) {
+            return MAP.get(id);
         }
     }
 
@@ -47,12 +58,37 @@ public class LogUtils {
         void error(String message);
     }
 
-    private static void setSL4JLoggingLevel(ch.qos.logback.classic.Level level) {
-        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
-        root.setLevel(level);
+    public static void init() {
     }
 
-    public static void init() {
+    public static void setCopycatLogLevel(LogLevel logLevel) {
+        COPYCAT_LOG_LEVEL = logLevel;
+
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+        switch (logLevel) {
+            case NONE:
+                root.setLevel(Level.OFF);
+                break;
+            case ERROR:
+                root.setLevel(Level.ERROR);
+                break;
+            case WARN:
+                root.setLevel(Level.WARN);
+                break;
+            case DEBUG:
+                root.setLevel(Level.DEBUG);
+                break;
+        }
+    }
+
+    public static void setLucidLogLevel(LogLevel logLevel) {
+        LUCID_LOG_LEVEL = logLevel;
+
+        if (logLevel == LogLevel.NONE) {
+            LOGGER = new NoOpLogger();
+        } else {
+            LOGGER = new PrintLogger();
+        }
     }
 
     public static void debug(String tag, String message, Throwable throwable) {
@@ -139,51 +175,84 @@ public class LogUtils {
         }
     }
 
+    private static class NoOpLogger implements Logger {
+
+        @Override
+        public void debug(String message, Throwable throwable) {
+
+        }
+
+        @Override
+        public void debug(String message) {
+
+        }
+
+        @Override
+        public void warn(String message, Throwable throwable) {
+
+        }
+
+        @Override
+        public void warn(String message) {
+
+        }
+
+        @Override
+        public void error(String message, Throwable throwable) {
+
+        }
+
+        @Override
+        public void error(String message) {
+
+        }
+    }
+
     private static class PrintLogger implements Logger {
 
         @Override
         public void debug(String message, Throwable throwable) {
-            if (LOG_LEVEL.ordinal() >= LogLevel.DEBUG.ordinal()) {
+            if (LUCID_LOG_LEVEL.ordinal() >= LogLevel.DEBUG.ordinal()) {
                 print(message, throwable);
             }
         }
 
         @Override
         public void debug(String message) {
-            if (LOG_LEVEL.ordinal() >= LogLevel.DEBUG.ordinal()) {
+            if (LUCID_LOG_LEVEL.ordinal() >= LogLevel.DEBUG.ordinal()) {
                 print(message, null);
             }
         }
 
         @Override
         public void warn(String message, Throwable throwable) {
-            if (LOG_LEVEL.ordinal() >= LogLevel.WARN.ordinal()) {
+            if (LUCID_LOG_LEVEL.ordinal() >= LogLevel.WARN.ordinal()) {
                 print(message, throwable);
             }
         }
 
         @Override
         public void warn(String message) {
-            if (LOG_LEVEL.ordinal() >= LogLevel.WARN.ordinal()) {
+            if (LUCID_LOG_LEVEL.ordinal() >= LogLevel.WARN.ordinal()) {
                 print(message, null);
             }
         }
 
         @Override
         public void error(String message, Throwable throwable) {
-            if (LOG_LEVEL.ordinal() >= LogLevel.ERROR.ordinal()) {
+            if (LUCID_LOG_LEVEL.ordinal() >= LogLevel.ERROR.ordinal()) {
                 print(message, throwable);
             }
         }
 
         @Override
         public void error(String message) {
-            if (LOG_LEVEL.ordinal() >= LogLevel.ERROR.ordinal()) {
+            if (LUCID_LOG_LEVEL.ordinal() >= LogLevel.ERROR.ordinal()) {
                 print(message, null);
             }
         }
 
-        private void print(String message, Throwable throwable) {
+        synchronized private void print(String message, Throwable throwable) {
             if (message != null) {
                 System.out.println(message);
             }
