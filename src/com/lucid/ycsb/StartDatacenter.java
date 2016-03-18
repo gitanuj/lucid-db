@@ -15,7 +15,7 @@ public class StartDatacenter {
 
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("Run as: StartDatacenter <PROROCOL> <CLUSTERID>");
+            System.out.println("Run as: StartDatacenter <PROTOCOL> <CLUSTERID>");
             return;
         }
         int datacenterID = Integer.parseInt(args[1]);
