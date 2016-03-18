@@ -179,6 +179,7 @@ public class RCServer {
         ObjectOutputStream oos = datacenterOutputStreams.get(coordinator);
         ServerMsg ackMsg = new ServerMsg(msg, Message.ACK_2PC_PREPARE);
 
+        Thread.sleep(Config.INTRA_DATACENTER_LATENCY);
         synchronized (oos) {
             oos.writeObject(ackMsg);
         }
@@ -212,6 +213,8 @@ public class RCServer {
             Set<AddressConfig> datacenterIPs = getDatacenterIPsFor(msg.getMap());
             for (AddressConfig config : datacenterIPs) {
                 ObjectOutputStream oos = datacenterOutputStreams.get(config);
+
+                Thread.sleep(Config.INTRA_DATACENTER_LATENCY);
                 synchronized (oos) {
                     oos.writeObject(commitMsg);
                 }
@@ -284,6 +287,8 @@ public class RCServer {
         if (msg.getKey() != null) {
             // Read query
             Pair<Long, String> value = stateMachine.read(msg.getKey());
+
+            Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
             outputStream.writeObject(value);
         } else {
             // Write command
@@ -294,6 +299,7 @@ public class RCServer {
             Set<AddressConfig> datacenterIPs = getDatacenterIPsFor(msg.getWriteMap());
             for (AddressConfig config : datacenterIPs) {
                 ObjectOutputStream oos = datacenterOutputStreams.get(config);
+                Thread.sleep(Config.INTRA_DATACENTER_LATENCY);
                 synchronized (oos) {
                     oos.writeObject(_2PCPrepare);
                 }
@@ -304,11 +310,13 @@ public class RCServer {
 
             // Inform client
             Pair<Long, String> value = new Pair<>(msg.getTxn_id(), "COMMIT");
+            Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
             outputStream.writeObject(value);
 
             // Inform other coordinators
             ServerMsg ack2PCPrepare = new ServerMsg(serverMsg, Message._2PC_ACCEPT);
             for (ObjectOutputStream oos : replicaOutputStreams.values()) {
+                Thread.sleep(Config.RC_INTER_DATACENTER_LATENCY);
                 synchronized (oos) {
                     oos.writeObject(ack2PCPrepare);
                 }
