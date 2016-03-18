@@ -209,6 +209,10 @@ public class RCServer {
 
     // Only received by a coordinator
     private void handleAck2PCPrepare(ServerMsg msg) throws Exception {
+        if (!msg.getCoordinator().equals(addressConfig)) {
+            throw new Exception("Unexpected msg received: " + msg);
+        }
+
         // Let the coordinator know that ack is received
         ackLocks.get(msg.getTxn_id()).release();
     }

@@ -59,7 +59,6 @@ class ServerMsg implements Serializable {
                 "txn_id=" + txn_id +
                 ", message=" + message +
                 ", key='" + key + '\'' +
-                ", map=" + map +
                 ", coordinator=" + coordinator +
                 '}';
     }
