@@ -508,7 +508,7 @@ public class SpannerServer {
 //        }
 //    }
 
-    private void obtainLocks(long tid, Set<String> keys) {
+    private synchronized void obtainLocks(long tid, Set<String> keys) {
         int numberOfLocks = keys.size();
         int counter = 0;
         List<Semaphore> locks = new ArrayList<>();
@@ -520,8 +520,8 @@ public class SpannerServer {
                 semaphore.acquire();
                 locks.add(semaphore);
             }
-            LogUtils.debug(LOG_TAG, "Txn " + tid + " got all locks.");
             lockMap.put(tid, locks);
+            LogUtils.debug(LOG_TAG, "Txn " + tid + " got all locks.");
         } catch (Exception e) {
             LogUtils.error(LOG_TAG, "Exception while locking for txn tid:" + tid, e);
             tryReleaseLocks(tid);

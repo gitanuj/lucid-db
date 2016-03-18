@@ -151,19 +151,18 @@ public class RCServer {
         Utils.startThreadWithName(runnable, "handle-server-msg");
     }
 
-    private void acquireTxnLocks(ServerMsg msg) throws Exception {
+    private synchronized void acquireTxnLocks(ServerMsg msg) throws Exception {
         List<Semaphore> lockList;
-        synchronized (txnLocks) {
-            lockList = txnLocks.get(msg.getTxn_id());
-            if (lockList == null) {
-                lockList = new ArrayList<>();
-                for (String key : msg.getMap().keySet()) {
-                    if (serverContainsKey(addressConfig, key)) {
-                        Semaphore semaphore = stripedSemaphore.get(key);
-                        lockList.add(semaphore);
-                    }
+        lockList = txnLocks.get(msg.getTxn_id());
+        if (lockList == null) {
+            lockList = new ArrayList<>();
+            for (String key : msg.getMap().keySet()) {
+                if (serverContainsKey(addressConfig, key)) {
+                    Semaphore semaphore = stripedSemaphore.get(key);
+                    lockList.add(semaphore);
                 }
             }
+            txnLocks.put(msg.getTxn_id(), lockList);
         }
 
         for (Semaphore semaphore : lockList) {
@@ -173,15 +172,13 @@ public class RCServer {
 
     private void releaseTxnLocks(ServerMsg msg) throws Exception {
         List<Semaphore> lockList;
-        synchronized (txnLocks) {
-            lockList = txnLocks.get(msg.getTxn_id());
-            if (lockList == null) {
-                lockList = new ArrayList<>();
-                for (String key : msg.getMap().keySet()) {
-                    if (serverContainsKey(addressConfig, key)) {
-                        Semaphore semaphore = stripedSemaphore.get(key);
-                        lockList.add(semaphore);
-                    }
+        lockList = txnLocks.get(msg.getTxn_id());
+        if (lockList == null) {
+            lockList = new ArrayList<>();
+            for (String key : msg.getMap().keySet()) {
+                if (serverContainsKey(addressConfig, key)) {
+                    Semaphore semaphore = stripedSemaphore.get(key);
+                    lockList.add(semaphore);
                 }
             }
         }
