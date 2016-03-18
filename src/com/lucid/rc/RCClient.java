@@ -5,8 +5,6 @@ import com.lucid.ycsb.YCSBClient;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -254,12 +252,12 @@ public class RCClient implements YCSBClient {
                 // Simulate RC client to datacenter average latency, and write object to datacenter.
                 Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
                 socket = new Socket(server.host(), server.getClientPort());
-                ObjectOutputStream writer = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+                ObjectOutputStream writer = new ObjectOutputStream(socket.getOutputStream());
                 writer.writeObject(new TransportObject(Config.TXN_ID_NOT_APPLICABLE, query.key()));
                 writer.flush();
 
                 // Wait for response.
-                ObjectInputStream reader = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
+                ObjectInputStream reader = new ObjectInputStream(socket.getInputStream());
                 result = (Pair<Long, String>) reader.readObject();
 
                 // Report to ReadMajoritySelector object.
@@ -310,12 +308,12 @@ public class RCClient implements YCSBClient {
                 // Simulate RC client to datacenter average latency, and write object to datacenter.
                 Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
                 socket = new Socket(server.host(), server.getClientPort());
-                ObjectOutputStream writer = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+                ObjectOutputStream writer = new ObjectOutputStream(socket.getOutputStream());
                 writer.writeObject(new TransportObject(command.getTxn_id(), command.getWriteCommands()));
                 writer.flush();
 
                 // Wait for response.
-                ObjectInputStream reader = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
+                ObjectInputStream reader = new ObjectInputStream(socket.getInputStream());
                 result = (Pair<Long, String>) reader.readObject();
                 LogUtils.debug(LOG_TAG, "Result for txn id " + writeFlags.getWriteTxnId() + " is " + result);
 
