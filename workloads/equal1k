@@ -13,8 +13,8 @@
 # permissions and limitations under the License. See accompanying
 # LICENSE file.
 
-recordcount=1000
-operationcount=1000
+recordcount=100
+operationcount=100
 workload=com.yahoo.ycsb.workloads.CoreWorkload
 
 readallfields=true
