@@ -5,6 +5,7 @@ import com.lucid.common.LogUtils;
 import com.lucid.common.ReadQuery;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.DB;
+import com.yahoo.ycsb.DBException;
 import com.yahoo.ycsb.Status;
 import io.atomix.copycat.Query;
 
@@ -18,7 +19,8 @@ public abstract class YCSBDB extends DB {
 
     private YCSBClient ycsbClient;
 
-    public YCSBDB() {
+    @Override
+    public void init() throws DBException {
         Config.init();
         this.ycsbClient = getYCSBClient();
         Batcher.getInstance().setYCSBClient(ycsbClient);

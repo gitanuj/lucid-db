@@ -5,14 +5,22 @@ import com.lucid.ycsb.YCSBClient;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class RCClient implements YCSBClient {
 
     private static final String LOG_TAG = "RC_CLIENT";
+
+    private Map<AddressConfig, ObjectOutputStream> OOS_MAP = new HashMap<>();
+
+    private Map<AddressConfig, ObjectInputStream> OIS_MAP = new HashMap<>();
 
     private class WriteFlags {
         private int writesReturned;
@@ -135,6 +143,18 @@ public class RCClient implements YCSBClient {
 
     }
 
+    public RCClient() {
+        for (AddressConfig addressConfig : Config.SERVER_IPS) {
+            try {
+                Socket socket = new Socket(addressConfig.host(), addressConfig.getClientPort());
+                OOS_MAP.put(addressConfig, new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream())));
+                OIS_MAP.put(addressConfig, new ObjectInputStream(new BufferedInputStream(socket.getInputStream())));
+            } catch (Exception e) {
+                LogUtils.error(LOG_TAG, "Failed to create socket for " + addressConfig);
+            }
+        }
+    }
+
     @Override
     public String executeQuery(Query query) throws Exception {
         LogUtils.debug(LOG_TAG, "Executing query: " + query);
@@ -236,8 +256,6 @@ public class RCClient implements YCSBClient {
 
         AddressConfig server;
         ReadQuery query;
-        ObjectOutputStream writer;
-        ObjectInputStream reader;
         Pair<Long, String> result;
         ReadFlags readFlags;
 
@@ -250,18 +268,18 @@ public class RCClient implements YCSBClient {
         @Override
         public void run() {
             try {
-                Socket socket = new Socket(server.host(), server.getClientPort());
-                writer = new ObjectOutputStream(socket.getOutputStream());
-
                 // Simulate RC client to datacenter average latency, and write object to datacenter.
                 Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
-                writer.writeObject(new TransportObject(Config.TXN_ID_NOT_APPLICABLE, query.key()));
+                ObjectOutputStream writer = OOS_MAP.get(server);
+                synchronized (writer) {
+                    writer.writeObject(new TransportObject(Config.TXN_ID_NOT_APPLICABLE, query.key()));
+                }
 
                 // Wait for response.
-                reader = new ObjectInputStream(socket.getInputStream());
-                result = (Pair<Long, String>) reader.readObject();
-
-                socket.close();
+                ObjectInputStream reader = OIS_MAP.get(server);
+                synchronized (reader) {
+                    result = (Pair<Long, String>) reader.readObject();
+                }
 
                 // Report to ReadMajoritySelector object.
                 readFlags.getReadMajoritySelector().threadReturned(result, readFlags);
@@ -294,8 +312,6 @@ public class RCClient implements YCSBClient {
     private class CommandCluster implements Runnable {
         AddressConfig server;
         WriteCommand command;
-        ObjectOutputStream writer;
-        ObjectInputStream reader;
         Pair<Long, String> result;
         WriteFlags writeFlags;
 
@@ -308,18 +324,19 @@ public class RCClient implements YCSBClient {
         @Override
         public void run() {
             try {
-                Socket socket = new Socket(server.host(), server.getClientPort());
-                writer = new ObjectOutputStream(socket.getOutputStream());
-
                 // Simulate RC client to datacenter average latency, and write object to datacenter.
                 Thread.sleep(Config.RC_CLIENT_TO_DATACENTER_AVG_LATENCY);
-                writer.writeObject(new TransportObject(command.getTxn_id(), command.getWriteCommands()));
+                ObjectOutputStream writer = OOS_MAP.get(server);
+                synchronized (writer) {
+                    writer.writeObject(new TransportObject(command.getTxn_id(), command.getWriteCommands()));
+                }
 
                 // Wait for response.
-                reader = new ObjectInputStream(socket.getInputStream());
-                result = (Pair<Long, String>) reader.readObject();
+                ObjectInputStream reader = OIS_MAP.get(server);
+                synchronized (reader) {
+                    result = (Pair<Long, String>) reader.readObject();
+                }
                 LogUtils.debug(LOG_TAG, "Result for txn id " + writeFlags.getWriteTxnId() + " is " + result);
-                socket.close();
 
                 // Report to WriteMajoritySelector object.
                 writeFlags.getWriteMajoritySelector().threadReturned(result, writeFlags);
