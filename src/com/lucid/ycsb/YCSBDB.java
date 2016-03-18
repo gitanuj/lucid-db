@@ -1,5 +1,6 @@
 package com.lucid.ycsb;
 
+import com.lucid.common.Config;
 import com.lucid.common.LogUtils;
 import com.lucid.common.ReadQuery;
 import com.yahoo.ycsb.ByteIterator;
@@ -18,6 +19,7 @@ public abstract class YCSBDB extends DB {
     private YCSBClient ycsbClient;
 
     public YCSBDB() {
+        Config.init();
         this.ycsbClient = getYCSBClient();
         Batcher.getInstance().setYCSBClient(ycsbClient);
     }
@@ -27,6 +29,7 @@ public abstract class YCSBDB extends DB {
 
     @Override
     public Status read(String table, String key, Set<String> fields, HashMap<String, ByteIterator> result) {
+        LogUtils.debug(LOG_TAG, "read: " + key);
         try {
             String qualifiedKey = YCSBUtils.createQualifiedKey(table, key);
             Query<String> query = new ReadQuery(qualifiedKey);
@@ -53,6 +56,7 @@ public abstract class YCSBDB extends DB {
 
     @Override
     public Status insert(String table, String key, HashMap<String, ByteIterator> values) {
+        LogUtils.debug(LOG_TAG, "insert: " + key);
         try {
             String qualifiedKey = YCSBUtils.createQualifiedKey(table, key);
             WriteObject writeObject = new WriteObject();

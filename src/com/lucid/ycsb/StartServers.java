@@ -10,6 +10,7 @@ import com.lucid.spanner.SpannerServer;
 public class StartServers {
 
     public static void main(String[] args) {
+        Config.init();
 
         for (int i = 0; i < Config.SERVER_IPS.size(); i++) {
             final int index = i;

@@ -14,6 +14,8 @@ import java.util.List;
 public class StartDatacenter {
 
     public static void main(String[] args) {
+        Config.init();
+
         if (args.length < 2) {
             System.out.println("Run as: StartDatacenter <PROTOCOL> <CLUSTERID>");
             return;

@@ -21,6 +21,7 @@ public class YCSBTester {
     }
 
     private static void startTest(int numberOfThreads, int protocol) {
+        Config.init();
 
         YCSBDB ycsbdb;
         if(protocol == Config.SPANNER) ycsbdb = new SpannerDB();

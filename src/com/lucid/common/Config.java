@@ -13,6 +13,10 @@ public final class Config {
     private Config() {
     }
 
+    public static void init() {
+
+    }
+
     public static final long TXN_ID_NOT_APPLICABLE = -1;
     public static int NUM_CLUSTERS;
     public static final List<AddressConfig> SERVER_IPS = new ArrayList<>();
