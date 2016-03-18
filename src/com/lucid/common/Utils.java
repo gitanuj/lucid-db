@@ -49,7 +49,7 @@ public class Utils {
         int offset = index % clusterSize;
 
         List<AddressConfig> list = new ArrayList<>();
-        for (int i = offset; i < clusterSize; i += clusterSize) {
+        for (int i = offset; i < Config.SERVER_IPS.size(); i += clusterSize) {
             list.add(Config.SERVER_IPS.get(i));
         }
         return list;
