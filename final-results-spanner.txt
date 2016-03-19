@@ -1,0 +1,49 @@
+Single threaded ycsb
+
+3 DCs, 3 shards, readheavy1k
+[OVERALL], RunTime(ms), 84669.0
+[OVERALL], Throughput(ops/sec), 11.810698130366486
+[READ], Operations, 949.0
+[READ], AverageLatency(us), 72932.68703898841
+[READ], MinLatency(us), 71040.0
+[READ], MaxLatency(us), 309247.0
+[READ], 95thPercentileLatency(us), 74559.0
+[READ], 99thPercentileLatency(us), 93311.0
+[READ], Return=OK, 949
+[CLEANUP], Operations, 1.0
+[CLEANUP], AverageLatency(us), 2.0
+[CLEANUP], MinLatency(us), 2.0
+[CLEANUP], MaxLatency(us), 2.0
+[CLEANUP], 95thPercentileLatency(us), 2.0
+[CLEANUP], 99thPercentileLatency(us), 2.0
+[INSERT], Operations, 51.0
+[INSERT], AverageLatency(us), 301532.862745098
+[INSERT], MinLatency(us), 269056.0
+[INSERT], MaxLatency(us), 528895.0
+[INSERT], 95thPercentileLatency(us), 384767.0
+[INSERT], 99thPercentileLatency(us), 402687.0
+[INSERT], Return=OK, 51
+
+3 DCs, 3 shards, equal1k
+[OVERALL], RunTime(ms), 183962.0
+[OVERALL], Throughput(ops/sec), 5.435905241299833
+[READ], Operations, 480.0
+[READ], AverageLatency(us), 74025.2
+[READ], MinLatency(us), 71616.0
+[READ], MaxLatency(us), 262911.0
+[READ], 95thPercentileLatency(us), 76223.0
+[READ], 99thPercentileLatency(us), 107071.0
+[READ], Return=OK, 480
+[CLEANUP], Operations, 1.0
+[CLEANUP], AverageLatency(us), 3.0
+[CLEANUP], MinLatency(us), 3.0
+[CLEANUP], MaxLatency(us), 3.0
+[CLEANUP], 95thPercentileLatency(us), 3.0
+[CLEANUP], 99thPercentileLatency(us), 3.0
+[INSERT], Operations, 520.0
+[INSERT], AverageLatency(us), 285155.44615384616
+[INSERT], MinLatency(us), 263424.0
+[INSERT], MaxLatency(us), 717311.0
+[INSERT], 95thPercentileLatency(us), 324607.0
+[INSERT], 99thPercentileLatency(us), 385535.0
+[INSERT], Return=OK, 520
