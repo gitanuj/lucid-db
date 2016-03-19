@@ -11,7 +11,7 @@ Implementation of Spanner and Replicated Commit
 
 3. Timeouts and Latencies
 
-Each shard is fully replicated. All the replicas of a shard are assumed to be listed together. Order of shards is same for all datacenters. For eg. X1, X2, Y2, Y2 where 1 & 2 are datacenters and X & Y are shards.
+Each shard is fully replicated. All the replicas of a shard are assumed to be listed together. Order of shards is same for all datacenters. For eg. X1, X2, Y1, Y2 where 1 & 2 are datacenters and X & Y are shards.
 
 Refer to `lucid-rc.config` and `lucid-spanner.config` for examples.
 
