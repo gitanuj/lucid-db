@@ -38,6 +38,6 @@ The implementation assumes that `lucid.config` contains valid information at all
 
 * Start client as:
       ```
-      java -cp lucid-db.jar com.yahoo.ycsb.Client -t -db com.lucid.ycsb.SpannerDB -P workloads/readyheavy1k    [or]
-      java -cp lucid-db.jar com.yahoo.ycsb.Client -t -db com.lucid.ycsb.RCDB -P workloads/readyheavy1k
+      java -cp lucid-db.jar com.yahoo.ycsb.Client -t -db com.lucid.ycsb.SpannerDB -P workloads/readheavy1k    [or]
+      java -cp lucid-db.jar com.yahoo.ycsb.Client -t -db com.lucid.ycsb.RCDB -P workloads/readheavy1k
       ```
