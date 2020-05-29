@@ -1,8 +1,8 @@
-#Lucid DB
+# Lucid DB
 
 Implementation of Spanner and Replicated Commit
 
-##Config
+## Config
 'lucid.config' is the configuration file which contains the following:
 
 1. IP address of all the shards (with distinct paxos, server and client ports)
